@@ -19,18 +19,17 @@ import app.omnivore.omnivore.core.datastore.omnivoreAuthToken
 import app.omnivore.omnivore.core.datastore.omnivorePendingUserToken
 import app.omnivore.omnivore.core.datastore.omnivoreSelfHostedApiServer
 import app.omnivore.omnivore.core.datastore.omnivoreSelfHostedWebServer
-import app.omnivore.omnivore.core.network.AuthProviderLoginSubmit
-import app.omnivore.omnivore.core.network.CreateAccountParams
-import app.omnivore.omnivore.core.network.CreateAccountSubmit
-import app.omnivore.omnivore.core.network.CreateEmailAccountSubmit
-import app.omnivore.omnivore.core.network.EmailLoginCredentials
-import app.omnivore.omnivore.core.network.EmailLoginSubmit
-import app.omnivore.omnivore.core.network.EmailSignUpParams
 import app.omnivore.omnivore.core.network.Networker
-import app.omnivore.omnivore.core.network.PendingUserSubmit
-import app.omnivore.omnivore.core.network.RetrofitHelper
-import app.omnivore.omnivore.core.network.SignInParams
-import app.omnivore.omnivore.core.network.UserProfile
+import app.omnivore.omnivore.core.network.model.CreateAccountParams
+import app.omnivore.omnivore.core.network.model.EmailLoginCredentials
+import app.omnivore.omnivore.core.network.model.EmailSignUpParams
+import app.omnivore.omnivore.core.network.model.SignInParams
+import app.omnivore.omnivore.core.network.retrofit.AuthProviderLoginSubmit
+import app.omnivore.omnivore.core.network.retrofit.CreateAccountSubmit
+import app.omnivore.omnivore.core.network.retrofit.CreateEmailAccountSubmit
+import app.omnivore.omnivore.core.network.retrofit.EmailLoginSubmit
+import app.omnivore.omnivore.core.network.retrofit.PendingUserSubmit
+import app.omnivore.omnivore.core.network.retrofit.RetrofitHelper
 import app.omnivore.omnivore.core.network.viewer
 import app.omnivore.omnivore.graphql.generated.ValidateUsernameQuery
 import app.omnivore.omnivore.utils.Constants
@@ -318,7 +317,7 @@ class LoginViewModel @Inject constructor(
 
             val pendingUserToken = getPendingAuthToken() ?: ""
 
-            val userProfile = UserProfile(name = name, username = username)
+            val userProfile = CreateAccountParams.UserProfile(name = name, username = username)
             val params = CreateAccountParams(
                 pendingUserToken = pendingUserToken, userProfile = userProfile
             )
