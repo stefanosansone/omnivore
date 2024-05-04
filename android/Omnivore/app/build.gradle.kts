@@ -7,6 +7,7 @@ plugins {
     id("dagger.hilt.android.plugin")
     alias(libs.plugins.ksp)
     alias(libs.plugins.apollo)
+    id("kotlinx-serialization")
 }
 
 val keystorePropertiesFile = rootProject.file("app/external/keystore.properties")
