@@ -8,7 +8,8 @@ import retrofit2.http.Headers
 import retrofit2.http.POST
 
 data class AuthPayload(
-    val authCookieString: String, val authToken: String
+    val authCookieString: String,
+    val authToken: String
 )
 
 data class PendingUserAuthPayload(
@@ -16,28 +17,37 @@ data class PendingUserAuthPayload(
 )
 
 data class SignInParams(
-    val token: String, val provider: String, // APPLE or GOOGLE
+    val token: String,
+    val provider: String, // APPLE or GOOGLE
     val source: String = "ANDROID"
 )
 
 data class EmailSignUpParams(
-    val email: String, val password: String, val username: String, val name: String
+    val email: String,
+    val password: String,
+    val username: String,
+    val name: String
 )
 
 data class EmailAuthPayload(
-    val authCookieString: String?, val authToken: String?, val pendingEmailVerification: Boolean?
+    val authCookieString: String?,
+    val authToken: String?,
+    val pendingEmailVerification: Boolean?
 )
 
 data class EmailLoginCredentials(
-    val email: String, val password: String
+    val email: String,
+    val password: String
 )
 
 data class CreateAccountParams(
-    val pendingUserToken: String, val userProfile: UserProfile
+    val pendingUserToken: String,
+    val userProfile: UserProfile
 )
 
 data class UserProfile(
-    val username: String, val name: String
+    val username: String,
+    val name: String
 )
 
 interface EmailLoginSubmit {
