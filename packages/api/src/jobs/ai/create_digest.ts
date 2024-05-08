@@ -8,23 +8,32 @@ import {
   SSMLOptions,
 } from '@omnivore/text-to-speech-handler'
 import axios from 'axios'
+import { truncate } from 'lodash'
 import showdown from 'showdown'
 import { v4 as uuid } from 'uuid'
 import yaml from 'yaml'
 import { LibraryItem } from '../../entity/library_item'
+import { User } from '../../entity/user'
+import { env } from '../../env'
 import { TaskState } from '../../generated/graphql'
 import { redisDataSource } from '../../redis_data_source'
-import { Digest, writeDigest } from '../../services/digest'
+import { Chapter, Digest, writeDigest } from '../../services/digest'
 import {
   findLibraryItemsByIds,
+  getItemUrl,
   searchLibraryItems,
 } from '../../services/library_item'
-import { findDeviceTokensByUserId } from '../../services/user_device_tokens'
+import { savePage } from '../../services/save_page'
+import {
+  findUserAndPersonalization,
+  sendPushNotifications,
+} from '../../services/user'
+import { enqueueSendEmail } from '../../utils/createTask'
 import { wordsCount } from '../../utils/helpers'
 import { logger } from '../../utils/logger'
 import { htmlToMarkdown } from '../../utils/parser'
-import { sendMulticastPushNotifications } from '../../utils/sendNotification'
-import { generateUploadFilePathName, uploadToBucket } from '../../utils/uploads'
+import { uploadToBucket } from '../../utils/uploads'
+import { getImageSize, _findThumbnail } from '../find_thumbnail'
 
 export type CreateDigestJobSchedule = 'daily' | 'weekly'
 
@@ -77,6 +86,8 @@ interface RankedTitle {
   title: string
 }
 
+type Channel = 'push' | 'email' | 'library'
+
 export const CREATE_DIGEST_JOB = 'create-digest'
 export const CRON_PATTERNS = {
   // every day at 10:30 UTC
@@ -84,6 +95,8 @@ export const CRON_PATTERNS = {
   // every Sunday at 10:30 UTC
   weekly: '30 10 * * 7',
 }
+
+const AUTHOR = 'Omnivore Digest'
 
 let digestDefinition: DigestDefinition
 
@@ -191,7 +204,9 @@ const getCandidatesList = async (
   const dedupedCandidates = candidates
     .flat()
     .filter(
-      (item, index, self) => index === self.findIndex((t) => t.id === item.id)
+      (item, index, self) =>
+        index === self.findIndex((t) => t.id === item.id) &&
+        !item.title.startsWith(AUTHOR) // exclude the digest items
     )
     .map((item) => ({
       ...item,
@@ -480,7 +495,9 @@ const filterSummaries = (summaries: RankedItem[]): RankedItem[] => {
 // we can use something more sophisticated to generate titles
 const generateTitle = (summaries: RankedItem[]): string =>
   'Omnivore digest: ' +
-  summaries.map((item) => item.libraryItem.title).join(', ')
+  summaries
+    .map((item) => item.libraryItem.title.replace(/\|.*/, '').trim()) // remove the author
+    .join(', ')
 
 // generate description based on the summaries
 const generateDescription = (
@@ -524,7 +541,7 @@ const uploadSummary = async (
   console.time('uploadSummary')
   logger.info('uploading summaries to gcs')
 
-  const filename = `digest/${userId}/${digest.id}/summaries.json`
+  const filename = `digest/${userId}/${digest.id}.json`
   await uploadToBucket(
     filename,
     Buffer.from(
@@ -546,14 +563,184 @@ const uploadSummary = async (
   console.timeEnd('uploadSummary')
 }
 
+const sendPushNotification = async (userId: string, digest: Digest) => {
+  const notification = {
+    title: AUTHOR,
+    body: truncate(digest.title, { length: 100 }),
+  }
+  const data = {
+    digestId: digest.id,
+  }
+
+  await sendPushNotifications(userId, notification, 'reminder', data)
+}
+
+const sendEmail = async (user: User, digest: Digest) => {
+  const title = `${AUTHOR} ${new Date().toLocaleDateString()}`
+  const subTitle = truncate(digest.title, { length: 200 }).slice(
+    AUTHOR.length + 1
+  )
+
+  const chapters = digest.chapters ?? []
+
+  const html = `
+    <div style="text-align: justify;">
+      <h2>${title}</h1>
+      <h2>${subTitle}</h2>
+
+        ${chapters
+          .map(
+            (chapter) => `
+              <div>
+                <a href="${chapter.url}"><h3>${chapter.title} (${chapter.wordCount} words)</h3></a>
+                <div>
+                  ${chapter.summary}
+                </div>
+              </div>`
+          )
+          .join('')}
+
+      <button style="background-color: #FFEAA0;
+                    border: 0px solid transparent;
+                    color: rgb(42, 42, 42);
+                    padding:15px 32px;
+                    font-size: 14px;
+                    margin: 20px 0;
+                    font-family: Inter, sans-serif;
+                    border-radius: 5px;">
+        <a href="${env.client.url}/digest/${digest.id}">Read in Omnivore</a>
+      </button>
+    </div>`
+
+  await enqueueSendEmail({
+    to: user.email,
+    from: env.sender.message,
+    subject: subTitle,
+    html,
+  })
+}
+
+const findThumbnail = async (
+  chapters: Chapter[]
+): Promise<string | undefined> => {
+  const thumbnails = chapters
+    .filter((chapter) => !!chapter.thumbnail)
+    .map((chapter) => chapter.thumbnail as string)
+    // randomly sort the thumbnails
+    .sort(() => 0.5 - Math.random())
+
+  try {
+    for (const thumbnail of thumbnails) {
+      const size = await getImageSize(thumbnail)
+      if (!size) {
+        continue
+      }
+
+      const selectedThumbnail = _findThumbnail([size])
+      if (selectedThumbnail) {
+        return selectedThumbnail
+      }
+    }
+  } catch {
+    logger.error('findThumbnail error')
+  }
+
+  return undefined
+}
+
+export const moveDigestToLibrary = async (user: User, digest: Digest) => {
+  const subTitle = digest.title?.slice(AUTHOR.length + 1) ?? ''
+  const title = `${AUTHOR}: ${subTitle}`
+
+  const chapters = digest.chapters ?? []
+
+  const html = `
+    <div style="text-align: justify;" class="_omnivore_digest">
+        ${chapters
+          .map(
+            (chapter) => `
+              <div>
+                <a href="${chapter.url}"><h3>${chapter.title} (${chapter.wordCount} words)</h3></a>
+                <div>
+                  ${chapter.summary}
+                </div>
+              </div>`
+          )
+          .join('')}
+    </div>`
+
+  const previewImage = await findThumbnail(chapters)
+
+  await savePage(
+    {
+      url: `${env.client.url}/omnivore-digest/${digest.id}`,
+      title,
+      originalContent: html,
+      clientRequestId: digest.id,
+      source: 'digest',
+      author: AUTHOR,
+      publishedAt: new Date(),
+      previewImage,
+    },
+    user
+  )
+}
+
+const sendToChannels = async (
+  user: User,
+  digest: Digest,
+  channels: Channel[] = ['push'] // default to push notification
+) => {
+  const deduplicateChannels = [...new Set(channels)]
+
+  await Promise.all(
+    deduplicateChannels.map(async (channel) => {
+      switch (channel) {
+        case 'push':
+          return sendPushNotification(user.id, digest)
+        case 'email':
+          return sendEmail(user, digest)
+        case 'library':
+          return moveDigestToLibrary(user, digest)
+        default:
+          logger.error('Unknown channel', { channel })
+          return
+      }
+    })
+  )
+}
+
 export const createDigest = async (jobData: CreateDigestData) => {
   console.time('createDigestJob')
 
   // generate a unique id for the digest if not provided for scheduled jobs
   const digestId = jobData.id ?? uuid()
+
   try {
+    const user = await findUserAndPersonalization(jobData.userId)
+    if (!user) {
+      logger.error('User not found', { userId: jobData.userId })
+      return await writeDigest(jobData.userId, {
+        id: digestId,
+        jobState: TaskState.Failed,
+        title: 'User not found',
+      })
+    }
+
+    const personalization = user.userPersonalization
+    if (!personalization) {
+      logger.info('User personalization not found')
+    }
+
+    const config = personalization
+      ? (personalization.digestConfig as {
+          model?: string
+          channels?: Channel[]
+        })
+      : undefined
+
     digestDefinition = await fetchDigestDefinition()
-    const model = selectModel(digestDefinition.model)
+    const model = selectModel(config?.model || digestDefinition.model)
     logger.info(`model: ${model}`)
 
     const candidates = await getCandidatesList(
@@ -562,10 +749,10 @@ export const createDigest = async (jobData: CreateDigestData) => {
     )
     if (candidates.length === 0) {
       logger.info('No candidates found')
-      return writeDigest(jobData.userId, {
+      return await writeDigest(jobData.userId, {
         id: digestId,
-        jobState: TaskState.Succeeded,
-        title: 'No articles found',
+        jobState: TaskState.Failed,
+        title: 'No candidates found',
       })
     }
 
@@ -590,24 +777,25 @@ export const createDigest = async (jobData: CreateDigestData) => {
       primaryVoice: jobData.voices?.[0],
       secondaryVoice: jobData.voices?.[1],
     })
-    const title = generateTitle(summaries)
-    const digest: Digest = {
+    const title = generateTitle(filteredSummaries)
+    const digest = {
       id: digestId,
       title,
-      content: generateContent(summaries),
+      content: generateContent(filteredSummaries),
       jobState: TaskState.Succeeded,
       speechFiles,
       chapters: filteredSummaries.map((item, index) => ({
         title: item.libraryItem.title,
         id: item.libraryItem.id,
-        url: item.libraryItem.originalUrl,
+        url: getItemUrl(item.libraryItem.id),
         thumbnail: item.libraryItem.thumbnail ?? undefined,
         wordCount: speechFiles[index].wordCount,
+        summary: item.summary,
       })),
       createdAt: new Date(),
       description: '',
-      // description: generateDescription(summaries, rankedTopics),
-      byline: generateByline(summaries),
+      // description: generateDescription(filteredSummaries, rankedTopics),
+      byline: generateByline(filteredSummaries),
       urlsToAudio: [],
       model,
     }
@@ -616,34 +804,24 @@ export const createDigest = async (jobData: CreateDigestData) => {
       // write the digest to redis
       writeDigest(jobData.userId, digest),
       // upload the summaries to GCS
-      uploadSummary(jobData.userId, digest, summaries).catch((error) =>
+      uploadSummary(jobData.userId, digest, filteredSummaries).catch((error) =>
         logger.error('uploadSummary error', error)
       ),
     ])
 
     logger.info(`digest created: ${digest.id}`)
+
+    // send notifications when digest is created
+    await sendToChannels(user, digest, config?.channels)
+
+    console.timeEnd('createDigestJob')
   } catch (error) {
     logger.error('createDigestJob error', error)
 
     await writeDigest(jobData.userId, {
       id: digestId,
       jobState: TaskState.Failed,
+      title: 'Failed to create digest',
     })
-  } finally {
-    // send notification
-    const tokens = await findDeviceTokensByUserId(jobData.userId)
-    if (tokens.length > 0) {
-      const message = {
-        notification: {
-          title: 'Digest ready',
-          body: 'Your digest is ready to listen',
-        },
-        tokens: tokens.map((token) => token.token),
-      }
-
-      await sendMulticastPushNotifications(jobData.userId, message, 'reminder')
-    }
-
-    console.timeEnd('createDigestJob')
   }
 }
