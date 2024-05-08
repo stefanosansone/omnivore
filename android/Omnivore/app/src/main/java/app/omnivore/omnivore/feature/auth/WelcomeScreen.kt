@@ -38,7 +38,9 @@ fun WelcomeScreen(viewModel: LoginViewModel) {
 
 @SuppressLint("CoroutineCreationDuringComposition")
 @Composable
-fun WelcomeScreenContent(viewModel: LoginViewModel) {
+fun WelcomeScreenContent(
+    viewModel: LoginViewModel
+) {
     val registrationState: RegistrationState by viewModel.registrationStateLiveData.observeAsState(
             RegistrationState.SocialLogin
         )
@@ -119,7 +121,9 @@ fun WelcomeScreenContent(viewModel: LoginViewModel) {
 }
 
 @Composable
-fun AuthProviderView(viewModel: LoginViewModel) {
+fun AuthProviderView(
+    viewModel: LoginViewModel
+) {
     val isGoogleAuthAvailable: Boolean =
         GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(LocalContext.current) == 0
 
