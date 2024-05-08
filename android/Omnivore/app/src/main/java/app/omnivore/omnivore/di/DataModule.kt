@@ -1,6 +1,8 @@
 package app.omnivore.omnivore.di
 
+import app.omnivore.omnivore.core.data.repository.AccountRepository
 import app.omnivore.omnivore.core.data.repository.LibraryRepository
+import app.omnivore.omnivore.core.data.repository.impl.AccountRepositoryImpl
 import app.omnivore.omnivore.core.data.repository.impl.LibraryRepositoryImpl
 import dagger.Binds
 import dagger.Module
@@ -15,4 +17,9 @@ interface DataModule {
     fun bindsLibraryRepository(
         libraryRepository: LibraryRepositoryImpl,
     ): LibraryRepository
+
+    @Binds
+    fun bindsAccountRepository(
+        accountRepository: AccountRepositoryImpl,
+    ): AccountRepository
 }

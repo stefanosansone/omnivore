@@ -18,25 +18,24 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
-  @Singleton
-  @Provides
-  fun provideDataStoreRepository(
-    @ApplicationContext app: Context
-  ): DatastoreRepository = OmnivoreDatastore(app)
+    @Singleton
+    @Provides
+    fun provideDataStoreRepository(
+        @ApplicationContext app: Context
+    ): DatastoreRepository = OmnivoreDatastore(app)
 
-  @Singleton
-  @Provides
-  fun provideNetworker(datastore: DatastoreRepository) = Networker(datastore)
+    @Singleton
+    @Provides
+    fun provideNetworker(datastore: DatastoreRepository) = Networker(datastore)
 
-  @Singleton
-  @Provides
-  fun provideAnalytics(@ApplicationContext app: Context) = EventTracker(app)
+    @Singleton
+    @Provides
+    fun provideAnalytics(@ApplicationContext app: Context) = EventTracker(app)
 
-  @Singleton
-  @Provides
-  fun provideDataService(
-      networker: Networker,
-      omnivoreDatabase: OmnivoreDatabase
-  ) = DataService(networker, omnivoreDatabase)
+    @Singleton
+    @Provides
+    fun provideDataService(
+        networker: Networker, omnivoreDatabase: OmnivoreDatabase
+    ) = DataService(networker, omnivoreDatabase)
 
 }
