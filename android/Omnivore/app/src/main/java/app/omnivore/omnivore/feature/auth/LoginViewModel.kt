@@ -11,7 +11,9 @@ import androidx.lifecycle.viewModelScope
 import app.omnivore.omnivore.BuildConfig
 import app.omnivore.omnivore.R
 import app.omnivore.omnivore.core.analytics.EventTracker
+import app.omnivore.omnivore.core.common.result.Result
 import app.omnivore.omnivore.core.data.DataService
+import app.omnivore.omnivore.core.data.repository.AccountRepository
 import app.omnivore.omnivore.core.datastore.DatastoreRepository
 import app.omnivore.omnivore.core.datastore.followingTabActive
 import app.omnivore.omnivore.core.datastore.omnivoreAuthCookieString
@@ -24,10 +26,8 @@ import app.omnivore.omnivore.core.network.model.CreateAccountParams
 import app.omnivore.omnivore.core.network.model.EmailLoginCredentials
 import app.omnivore.omnivore.core.network.model.EmailSignUpParams
 import app.omnivore.omnivore.core.network.model.SignInParams
-import app.omnivore.omnivore.core.network.retrofit.AuthProviderLoginSubmit
 import app.omnivore.omnivore.core.network.retrofit.CreateAccountSubmit
 import app.omnivore.omnivore.core.network.retrofit.CreateEmailAccountSubmit
-import app.omnivore.omnivore.core.network.retrofit.EmailLoginSubmit
 import app.omnivore.omnivore.core.network.retrofit.PendingUserSubmit
 import app.omnivore.omnivore.core.network.retrofit.RetrofitHelper
 import app.omnivore.omnivore.core.network.viewer
@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import retrofit2.HttpException
 import java.util.regex.Pattern
 import javax.inject.Inject
 
@@ -62,6 +63,7 @@ data class PendingEmailUserCreds(
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val datastoreRepository: DatastoreRepository,
+    private val accountRepository: AccountRepository,
     private val eventTracker: EventTracker,
     private val networker: Networker,
     private val dataService: DataService,
@@ -235,40 +237,44 @@ class LoginViewModel @Inject constructor(
     fun login(email: String, password: String) {
 
         viewModelScope.launch {
-            val emailLogin =
-                RetrofitHelper.getInstance(networker).create(EmailLoginSubmit::class.java)
 
             isLoading = true
             errorMessage = null
 
-            val result = emailLogin.submitEmailLogin(
+            accountRepository.submitEmailLogin(
                 EmailLoginCredentials(email = email, password = password)
-            )
+            ).collect {
+                isLoading = false
+                when (it) {
+                    is Result.Success -> {
+                        if (it.data.pendingEmailVerification == true) {
+                            showEmailSignUp(
+                                pendingCreds = PendingEmailUserCreds(
+                                    email = email, password = password
+                                )
+                            )
+                            return@collect
+                        }
 
-            isLoading = false
+                        if (it.data.authToken != null) {
+                            datastoreRepository.putString(omnivoreAuthToken, it.data.authToken)
+                        } else {
+                            errorMessage = resourceProvider.getString(
+                                R.string.login_view_model_something_went_wrong_error_msg
+                            )
+                        }
 
-            if (result.body()?.pendingEmailVerification == true) {
-                showEmailSignUp(
-                    pendingCreds = PendingEmailUserCreds(
-                        email = email, password = password
-                    )
-                )
-                return@launch
+                        if (it.data.authCookieString != null) {
+                            datastoreRepository.putString(
+                                omnivoreAuthCookieString, it.data.authCookieString
+                            )
+                        }
+                    }
+                    is Result.Error -> TODO()
+                    Result.Loading -> TODO()
+                }
             }
 
-            if (result.body()?.authToken != null) {
-                datastoreRepository.putString(omnivoreAuthToken, result.body()?.authToken!!)
-            } else {
-                errorMessage = resourceProvider.getString(
-                    R.string.login_view_model_something_went_wrong_error_msg
-                )
-            }
-
-            if (result.body()?.authCookieString != null) {
-                datastoreRepository.putString(
-                    omnivoreAuthCookieString, result.body()?.authCookieString!!
-                )
-            }
         }
     }
 
@@ -385,45 +391,52 @@ class LoginViewModel @Inject constructor(
     private fun submitAuthProviderPayload(params: SignInParams) {
 
         viewModelScope.launch {
-            val login =
-                RetrofitHelper.getInstance(networker).create(AuthProviderLoginSubmit::class.java)
 
             isLoading = true
             errorMessage = null
 
-            val result = login.submitAuthProviderLogin(params)
+            accountRepository.submitAuthProviderLogin(params).collect {
+                isLoading = false
 
-            isLoading = false
+                when (it) {
+                    is Result.Success -> {
+                        datastoreRepository.putString(omnivoreAuthToken, it.data.authToken)
 
-            if (result.body()?.authToken != null) {
-                datastoreRepository.putString(omnivoreAuthToken, result.body()?.authToken!!)
-
-                if (result.body()?.authCookieString != null) {
-                    datastoreRepository.putString(
-                        omnivoreAuthCookieString, result.body()?.authCookieString!!
-                    )
-                }
-            } else {
-                when (result.code()) {
-                    401, 403 -> {
-                        // This is a new user so they should go through the new user flow
-                        submitAuthProviderPayloadForPendingToken(params = params)
-                    }
-
-                    418 -> {
-                        // Show pending email state
-                        errorMessage = resourceProvider.getString(
-                            R.string.login_view_model_something_went_wrong_two_error_msg
+                        datastoreRepository.putString(
+                            omnivoreAuthCookieString, it.data.authCookieString
                         )
                     }
-
-                    else -> {
-                        errorMessage = resourceProvider.getString(
-                            R.string.login_view_model_something_went_wrong_two_error_msg
-                        )
+                    is Result.Loading -> {
+                        // Do nothing
+                    }
+                    is Result.Error -> {
+                        if (it.exception is HttpException) {
+                            when (it.exception.code()) {
+                                401, 403 -> {
+                                    // This is a new user so they should go through the new user flow
+                                    submitAuthProviderPayloadForPendingToken(params = params)
+                                }
+                                418 -> {
+                                    // Show pending email state
+                                    errorMessage = resourceProvider.getString(
+                                        R.string.login_view_model_something_went_wrong_two_error_msg
+                                    )
+                                }
+                                else -> {
+                                    errorMessage = resourceProvider.getString(
+                                        R.string.login_view_model_something_went_wrong_two_error_msg
+                                    )
+                                }
+                            }
+                        } else {
+                            errorMessage = resourceProvider.getString(
+                                R.string.login_view_model_something_went_wrong_two_error_msg
+                            )
+                        }
                     }
                 }
             }
+
         }
     }
 
