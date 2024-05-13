@@ -4,20 +4,12 @@ import app.omnivore.omnivore.core.network.Networker
 import app.omnivore.omnivore.core.network.model.AuthPayload
 import app.omnivore.omnivore.core.network.model.CreateAccountParams
 import app.omnivore.omnivore.core.network.model.EmailSignUpParams
-import app.omnivore.omnivore.core.network.model.PendingUserAuthPayload
-import app.omnivore.omnivore.core.network.model.SignInParams
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.Headers
 import retrofit2.http.POST
-
-interface PendingUserSubmit {
-    @Headers("Content-Type: application/json")
-    @POST("/api/mobile-auth/sign-up")
-    suspend fun submitPendingUser(@Body params: SignInParams): Response<PendingUserAuthPayload>
-}
 
 interface CreateAccountSubmit {
     @Headers("Content-Type: application/json")
