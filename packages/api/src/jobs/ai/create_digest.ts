@@ -9,7 +9,6 @@ import {
 } from '@omnivore/text-to-speech-handler'
 import axios from 'axios'
 import { truncate } from 'lodash'
-import showdown from 'showdown'
 import { v4 as uuid } from 'uuid'
 import yaml from 'yaml'
 import { LibraryItem } from '../../entity/library_item'
@@ -28,10 +27,13 @@ import {
   findUserAndPersonalization,
   sendPushNotifications,
 } from '../../services/user'
+import { ANTHROPIC_MODEL, OPENAI_MODEL } from '../../utils/ai'
+import { analytics } from '../../utils/analytics'
 import { enqueueSendEmail } from '../../utils/createTask'
 import { wordsCount } from '../../utils/helpers'
+import { createThumbnailProxyUrl } from '../../utils/imageproxy'
 import { logger } from '../../utils/logger'
-import { htmlToMarkdown } from '../../utils/parser'
+import { htmlToMarkdown, markdownToHtml } from '../../utils/parser'
 import { uploadToBucket } from '../../utils/uploads'
 import { getImageSize, _findThumbnail } from '../find_thumbnail'
 
@@ -173,7 +175,9 @@ const getCandidatesList = async (
   //   reason: "most recent 100 items saved over 500 words
 
   if (selectedLibraryItemIds) {
-    return findLibraryItemsByIds(selectedLibraryItemIds, userId)
+    return findLibraryItemsByIds(selectedLibraryItemIds, userId, {
+      select: ['id', 'title', 'readableContent', 'author', 'thumbnail'],
+    })
   }
 
   // // get the existing candidate ids from cache
@@ -253,7 +257,7 @@ const createUserProfile = async (
   preferences: LibraryItem[]
 ): Promise<string> => {
   const llm = new OpenAI({
-    modelName: 'gpt-4-0125-preview',
+    modelName: OPENAI_MODEL,
     configuration: {
       apiKey: process.env.OPENAI_API_KEY,
     },
@@ -297,7 +301,7 @@ const rankCandidates = async (
   userProfile: string
 ): Promise<RankedItem[]> => {
   const llm = new OpenAI({
-    modelName: 'gpt-4-0125-preview',
+    modelName: OPENAI_MODEL,
     configuration: {
       apiKey: process.env.OPENAI_API_KEY,
     },
@@ -393,7 +397,7 @@ const summarizeItems = async (
 
   if (model === 'openai') {
     const llm = new OpenAI({
-      modelName: 'gpt-4-0125-preview',
+      modelName: OPENAI_MODEL,
       configuration: {
         apiKey: process.env.OPENAI_API_KEY,
       },
@@ -422,7 +426,7 @@ const summarizeItems = async (
   // use anthropic otherwise
   const llm = new ChatAnthropic({
     apiKey: process.env.CLAUDE_API_KEY,
-    model: 'claude-3-sonnet-20240229',
+    model: ANTHROPIC_MODEL,
   })
 
   const prompts = await Promise.all(
@@ -454,22 +458,18 @@ const summarizeItems = async (
 
 // generate speech files from the summaries
 const generateSpeechFiles = (
-  rankedItems: RankedItem[],
+  summariesInHtml: string[],
   options: SSMLOptions
 ): SpeechFile[] => {
   console.time('generateSpeechFiles')
-  // convert the summaries from markdown to HTML
-  const converter = new showdown.Converter({
-    backslashEscapesHTMLTags: true,
-  })
 
-  const speechFiles = rankedItems.map((item) => {
+  const speechFiles = summariesInHtml.map((summary) => {
     const html = `
-    <div id="readability-content">
-      <div id="readability-page-1">
-        ${converter.makeHtml(item.summary)}
-      </div>
-    </div>`
+      <div id="readability-content">
+        <div id="readability-page-1">
+          ${summary}
+        </div>
+      </div>`
     return htmlToSpeechFile({
       content: html,
       options,
@@ -575,16 +575,17 @@ const sendPushNotification = async (userId: string, digest: Digest) => {
   await sendPushNotifications(userId, notification, 'reminder', data)
 }
 
-const sendEmail = async (user: User, digest: Digest) => {
+const sendEmail = async (user: User, digest: Digest, channels: Channel[]) => {
   const title = `${AUTHOR} ${new Date().toLocaleDateString()}`
-  const subTitle = truncate(digest.title, { length: 200 }).slice(
+  const subTitle = truncate(digest.title, { length: 65 }).slice(
     AUTHOR.length + 1
   )
+  const isInLibrary = channels.includes('library')
 
   const chapters = digest.chapters ?? []
 
   const html = `
-    <div style="text-align: justify;">
+    <div>
       <h2>${title}</h1>
       <h2>${subTitle}</h2>
 
@@ -594,21 +595,39 @@ const sendEmail = async (user: User, digest: Digest) => {
               <div>
                 <a href="${chapter.url}"><h3>${chapter.title} (${chapter.wordCount} words)</h3></a>
                 <div>
-                  ${chapter.summary}
+                  ${chapter.html}
                 </div>
               </div>`
           )
           .join('')}
 
-      <button style="background-color: #FFEAA0;
+      ${
+        isInLibrary
+          ? `<button style="background-color: #FFEAA0;
                     border: 0px solid transparent;
-                    color: rgb(42, 42, 42);
                     padding:15px 32px;
                     font-size: 14px;
                     margin: 20px 0;
                     font-family: Inter, sans-serif;
                     border-radius: 5px;">
-        <a href="${env.client.url}/digest/${digest.id}">Read in Omnivore</a>
+              <a href="${env.client.url}/digest/${digest.id}">Read in Omnivore</a>
+            </button>`
+          : ''
+      }
+
+      <button style="
+          font-size: 14px;
+          margin: 20px 0;
+          border: 0px solid transparent;
+          padding: 15px 32px;
+          font-size: 14px;
+          margin: 20px 0;
+          font-family: Inter, sans-serif;
+          border-radius: 5px;
+      ">
+        <a href="${
+          env.client.url
+        }/settings/account">Update digest preferences</a>
       </button>
     </div>`
 
@@ -631,7 +650,9 @@ const findThumbnail = async (
 
   try {
     for (const thumbnail of thumbnails) {
-      const size = await getImageSize(thumbnail)
+      const proxyUrl = createThumbnailProxyUrl(thumbnail)
+      // pre-cache thumbnail first if exists
+      const size = await getImageSize(proxyUrl)
       if (!size) {
         continue
       }
@@ -655,19 +676,23 @@ export const moveDigestToLibrary = async (user: User, digest: Digest) => {
   const chapters = digest.chapters ?? []
 
   const html = `
-    <div style="text-align: justify;" class="_omnivore_digest">
-        ${chapters
-          .map(
-            (chapter) => `
-              <div>
-                <a href="${chapter.url}"><h3>${chapter.title} (${chapter.wordCount} words)</h3></a>
-                <div>
-                  ${chapter.summary}
-                </div>
-              </div>`
-          )
-          .join('')}
-    </div>`
+    <html>
+      <body>
+        <div class="_omnivore_digest">
+            ${chapters
+              .map(
+                (chapter) => `
+                  <div>
+                    <a href="${chapter.url}"><h3>${chapter.title} (${chapter.wordCount} words)</h3></a>
+                    <div>
+                      ${chapter.html}
+                    </div>
+                  </div>`
+              )
+              .join('')}
+        </div>
+      </body>
+    </html>`
 
   const previewImage = await findThumbnail(chapters)
 
@@ -681,6 +706,7 @@ export const moveDigestToLibrary = async (user: User, digest: Digest) => {
       author: AUTHOR,
       publishedAt: new Date(),
       previewImage,
+      labels: [{ name: 'Digest', color: '#767AF8' }],
     },
     user
   )
@@ -697,15 +723,27 @@ const sendToChannels = async (
     deduplicateChannels.map(async (channel) => {
       switch (channel) {
         case 'push':
-          return sendPushNotification(user.id, digest)
+          await sendPushNotification(user.id, digest)
+          break
         case 'email':
-          return sendEmail(user, digest)
+          await sendEmail(user, digest, deduplicateChannels)
+          break
         case 'library':
-          return moveDigestToLibrary(user, digest)
+          await moveDigestToLibrary(user, digest)
+          break
         default:
           logger.error('Unknown channel', { channel })
           return
       }
+
+      analytics.capture({
+        distinctId: user.id,
+        event: 'digest_created',
+        properties: {
+          channel,
+          digestId: digest.id,
+        },
+      })
     })
   )
 }
@@ -771,8 +809,16 @@ export const createDigest = async (jobData: CreateDigestData) => {
     console.timeEnd('summarizeItems')
 
     const filteredSummaries = filterSummaries(summaries)
+    const summariesInHtml = filteredSummaries.map((item) => {
+      try {
+        return markdownToHtml(item.summary)
+      } catch (error) {
+        logger.error('markdownToHtml error', error)
+        return ''
+      }
+    })
 
-    const speechFiles = generateSpeechFiles(filteredSummaries, {
+    const speechFiles = generateSpeechFiles(summariesInHtml, {
       ...jobData,
       primaryVoice: jobData.voices?.[0],
       secondaryVoice: jobData.voices?.[1],
@@ -788,9 +834,12 @@ export const createDigest = async (jobData: CreateDigestData) => {
         title: item.libraryItem.title,
         id: item.libraryItem.id,
         url: getItemUrl(item.libraryItem.id),
-        thumbnail: item.libraryItem.thumbnail ?? undefined,
+        thumbnail: item.libraryItem.thumbnail
+          ? createThumbnailProxyUrl(item.libraryItem.thumbnail)
+          : undefined,
         wordCount: speechFiles[index].wordCount,
-        summary: item.summary,
+        html: summariesInHtml[index],
+        author: item.libraryItem.author ?? undefined,
       })),
       createdAt: new Date(),
       description: '',

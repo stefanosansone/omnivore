@@ -28,8 +28,8 @@ android {
         applicationId = "app.omnivore.omnivore"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2020004
-        versionName = "0.202.4"
+        versionCode = 2110000
+        versionName = "0.211.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -170,6 +170,9 @@ dependencies {
 
     implementation(libs.androidx.core.splashscreen)
 
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.work.compiler)
 }
 
 apollo {

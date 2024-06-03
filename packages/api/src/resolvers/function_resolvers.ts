@@ -4,11 +4,14 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { createHmac } from 'crypto'
+import { isError } from 'lodash'
 import { Highlight as HighlightEntity } from '../entity/highlight'
+import { LibraryItem } from '../entity/library_item'
 import {
   EXISTING_NEWSLETTER_FOLDER,
   NewsletterEmail,
 } from '../entity/newsletter_email'
+import { PublicItem } from '../entity/public_item'
 import {
   DEFAULT_SUBSCRIPTION_FOLDER,
   Subscription,
@@ -17,6 +20,9 @@ import { env } from '../env'
 import {
   Article,
   Highlight,
+  HomeItem,
+  HomeItemSource,
+  HomeItemSourceType,
   Label,
   PageType,
   Recommendation,
@@ -25,6 +31,7 @@ import {
 } from '../generated/graphql'
 import { getAISummary } from '../services/ai-summaries'
 import { findUserFeatures } from '../services/features'
+import { Merge } from '../util'
 import {
   highlightDataToHighlight,
   isBase64Image,
@@ -53,6 +60,11 @@ import {
   saveDiscoverArticleResolver,
 } from './discover_feeds'
 import { optInFeatureResolver } from './features'
+import {
+  hiddenHomeSectionResolver,
+  homeResolver,
+  refreshHomeResolver,
+} from './home'
 import { uploadImportFileResolver } from './importers/uploadImportFileResolver'
 import {
   addPopularReadResolver,
@@ -158,6 +170,7 @@ import {
   replyToEmailResolver,
 } from './recent_emails'
 import { recentSearchesResolver } from './recent_searches'
+import { subscriptionResolver } from './subscriptions'
 import { WithDataSourcesContext } from './types'
 import { updateEmailResolver } from './user'
 
@@ -323,6 +336,7 @@ export const functionResolvers = {
     fetchContent: fetchContentResolver,
     exportToIntegration: exportToIntegrationResolver,
     replyToEmail: replyToEmailResolver,
+    refreshHome: refreshHomeResolver,
   },
   Query: {
     me: getMeUserResolver,
@@ -359,6 +373,9 @@ export const functionResolvers = {
     feeds: feedsResolver,
     scanFeeds: scanFeedsResolver,
     integration: integrationResolver,
+    home: homeResolver,
+    subscription: subscriptionResolver,
+    hiddenHomeSection: hiddenHomeSectionResolver,
   },
   User: {
     async intercomHash(
@@ -515,7 +532,8 @@ export const functionResolvers = {
     ) {
       if (item.labels) return item.labels
 
-      return ctx.dataLoaders.labels.load(item.id)
+      const labels = await ctx.dataLoaders.labels.load(item.id)
+      return labels
     },
     async recommendations(
       item: {
@@ -621,6 +639,150 @@ export const functionResolvers = {
       return newsletterEmail.folder || EXISTING_NEWSLETTER_FOLDER
     },
   },
+  HomeSection: {
+    title: (section: { title?: string; layout: string }) => {
+      if (section.title) return section.title
+
+      switch (section.layout) {
+        case 'just_added':
+          return 'Just Added'
+        case 'top_picks':
+          return 'Top Picks'
+        case 'quick_links':
+          return 'Quick Links'
+        case 'hidden':
+          return 'Hidden Gems'
+        default:
+          return ''
+      }
+    },
+    async items(
+      section: {
+        items: Array<{
+          id: string
+          type: 'library_item' | 'public_item'
+          score: number
+        }>
+      },
+      _: unknown,
+      ctx: WithDataSourcesContext
+    ) {
+      const items = section.items
+
+      const libraryItemIds = items
+        .filter((item) => item.type === 'library_item')
+        .map((item) => item.id)
+      const libraryItems = (
+        await ctx.dataLoaders.libraryItems.loadMany(libraryItemIds)
+      ).filter((libraryItem) => !isError(libraryItem)) as Array<LibraryItem>
+
+      const publicItemIds = section.items
+        .filter((item) => item.type === 'public_item')
+        .map((item) => item.id)
+      const publicItems = (
+        await ctx.dataLoaders.publicItems.loadMany(publicItemIds)
+      ).filter((publicItem) => !isError(publicItem)) as Array<PublicItem>
+
+      return items
+        .map((item) => {
+          const libraryItem = libraryItems.find(
+            (libraryItem) => item.id === libraryItem.id
+          )
+          if (libraryItem) {
+            return {
+              id: libraryItem.id,
+              title: libraryItem.title,
+              author: libraryItem.author,
+              thumbnail: libraryItem.thumbnail,
+              wordCount: libraryItem.wordCount,
+              date: libraryItem.savedAt,
+              url: libraryItem.originalUrl,
+              canArchive: !libraryItem.archivedAt,
+              canDelete: !libraryItem.deletedAt,
+              canSave: false,
+              canComment: false,
+              canShare: true,
+              dir: libraryItem.directionality,
+              previewContent: libraryItem.description,
+              subscription: libraryItem.subscription,
+              siteName: libraryItem.siteName,
+              siteIcon: libraryItem.siteIcon,
+              slug: libraryItem.slug,
+              score: item.score,
+            }
+          }
+
+          const publicItem = publicItems.find(
+            (publicItem) => item.id === publicItem.id
+          )
+          if (publicItem) {
+            return {
+              id: publicItem.id,
+              title: publicItem.title,
+              author: publicItem.author,
+              dir: publicItem.dir,
+              previewContent: publicItem.previewContent,
+              thumbnail: publicItem.thumbnail,
+              wordCount: publicItem.wordCount,
+              date: publicItem.createdAt,
+              url: publicItem.url,
+              canArchive: false,
+              canDelete: false,
+              canSave: true,
+              canComment: true,
+              canShare: true,
+              broadcastCount: publicItem.stats.broadcastCount,
+              likeCount: publicItem.stats.likeCount,
+              saveCount: publicItem.stats.saveCount,
+              source: publicItem.source,
+              score: item.score,
+            }
+          }
+        })
+        .filter((item) => !!item)
+    },
+  },
+  HomeItem: {
+    async source(
+      item: Merge<
+        HomeItem,
+        { subscription?: string; siteName: string; siteIcon?: string }
+      >,
+      _: unknown,
+      ctx: WithDataSourcesContext
+    ): Promise<HomeItemSource> {
+      if (item.source) {
+        return item.source
+      }
+
+      if (!item.subscription) {
+        return {
+          name: item.siteName,
+          icon: item.siteIcon,
+          type: HomeItemSourceType.Library,
+        }
+      }
+
+      const subscription = await ctx.dataLoaders.subscriptions.load(
+        item.subscription
+      )
+      if (!subscription) {
+        return {
+          name: item.siteName,
+          icon: item.siteIcon,
+          type: HomeItemSourceType.Library,
+        }
+      }
+
+      return {
+        id: subscription.id,
+        url: subscription.url,
+        name: subscription.name,
+        icon: subscription.icon,
+        type: subscription.type as unknown as HomeItemSourceType,
+      }
+    },
+  },
   ...resultResolveTypeResolver('Login'),
   ...resultResolveTypeResolver('LogOut'),
   ...resultResolveTypeResolver('GoogleSignup'),
@@ -720,4 +882,8 @@ export const functionResolvers = {
   ...resultResolveTypeResolver('Integration'),
   ...resultResolveTypeResolver('ExportToIntegration'),
   ...resultResolveTypeResolver('ReplyToEmail'),
+  ...resultResolveTypeResolver('Home'),
+  ...resultResolveTypeResolver('Subscription'),
+  ...resultResolveTypeResolver('RefreshHome'),
+  ...resultResolveTypeResolver('HiddenHomeSection'),
 }

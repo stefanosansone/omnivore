@@ -21,9 +21,11 @@ import { redisDataSource } from '../redis_data_source'
 import { authTrx, getColumns, queryBuilderToRawSql } from '../repository'
 import { libraryItemRepository } from '../repository/library_item'
 import { Merge, PickTuple } from '../util'
+import { enqueueBulkUploadContentJob } from '../utils/createTask'
 import { deepDelete, setRecentlySavedItemInRedis } from '../utils/helpers'
-import { logger } from '../utils/logger'
+import { logError, logger } from '../utils/logger'
 import { parseSearchQuery } from '../utils/search'
+import { contentFilePath, downloadFromBucket } from '../utils/uploads'
 import { HighlightEvent } from './highlights'
 import { addLabelsToLibraryItem, LabelEvent } from './labels'
 
@@ -58,6 +60,7 @@ enum ReadFilter {
   READ = 'read',
   READING = 'reading',
   UNREAD = 'unread',
+  SEEN = 'seen',
 }
 
 enum InFilter {
@@ -136,6 +139,30 @@ interface Select {
 }
 
 const readingProgressDataSource = new ReadingProgressDataSource()
+
+export const batchGetLibraryItems = async (ids: readonly string[]) => {
+  const items = await findLibraryItemsByIds(ids as string[], undefined, {
+    select: [
+      'id',
+      'title',
+      'author',
+      'thumbnail',
+      'wordCount',
+      'savedAt',
+      'originalUrl',
+      'directionality',
+      'description',
+      'subscription',
+      'siteName',
+      'siteIcon',
+      'archivedAt',
+      'deletedAt',
+      'slug',
+    ],
+  })
+
+  return ids.map((id) => items.find((item) => item.id === id) || undefined)
+}
 
 export const getItemUrl = (id: string) => `${env.client.url}/me/${id}`
 
@@ -300,12 +327,14 @@ export const buildQueryString = (
             case InFilter.ALL:
               return null
             case InFilter.ARCHIVE:
-              return "(library_item.state = 'ARCHIVED' or (library_item.state != 'DELETED' and library_item.archived_at is not null))"
+              return `(library_item.state = 'ARCHIVED' 
+                        OR (library_item.state IN ('SUCCEEDED', 'ARCHIVED', 'PROCESSING', 'FAILED', 'CONTENT_NOT_FETCHED') 
+                          AND library_item.archived_at IS NOT NULL))`
             case InFilter.TRASH:
               // return only deleted pages within 14 days
-              return "(library_item.state = 'DELETED' AND library_item.deleted_at >= now() - interval '14 days')"
+              return "(library_item.state = 'DELETED' AND library_item.deleted_at >= NOW() - INTERVAL '14 days')"
             default: {
-              let sql = 'library_item.archived_at is null'
+              let sql = 'library_item.archived_at IS NULL'
               if (useFolders) {
                 const param = `folder_${parameters.length}`
                 const folderSql = escapeQueryWithParameters(
@@ -328,6 +357,8 @@ export const buildQueryString = (
               return 'library_item.reading_progress_bottom_percent BETWEEN 2 AND 98'
             case ReadFilter.UNREAD:
               return 'library_item.reading_progress_bottom_percent < 2'
+            case ReadFilter.SEEN:
+              return 'library_item.seen_at IS NOT NULL'
             default:
               throw new Error(`Unexpected keyword: ${value}`)
           }
@@ -662,7 +693,9 @@ export const createSearchQueryBuilder = (
   }
 
   if (!args.includeDeleted) {
-    queryBuilder.andWhere("library_item.state <> 'DELETED'")
+    queryBuilder.andWhere(
+      "library_item.state IN ('SUCCEEDED', 'ARCHIVED', 'PROCESSING', 'FAILED', 'CONTENT_NOT_FETCHED')"
+    )
   }
 
   if (queryString) {
@@ -764,10 +797,18 @@ export const findRecentLibraryItems = async (
   )
 }
 
-export const findLibraryItemsByIds = async (ids: string[], userId: string) => {
-  const selectColumns = getColumns(libraryItemRepository)
-    .filter((column) => column !== 'originalContent')
-    .map((column) => `library_item.${column}`)
+export const findLibraryItemsByIds = async (
+  ids: string[],
+  userId?: string,
+  options?: {
+    select?: (keyof LibraryItem)[]
+  }
+) => {
+  const selectColumns =
+    options?.select?.map((column) => `library_item.${column}`) ||
+    getColumns(libraryItemRepository)
+      .filter((column) => column !== 'originalContent')
+      .map((column) => `library_item.${column}`)
   return authTrx(
     async (tx) =>
       tx
@@ -782,17 +823,27 @@ export const findLibraryItemsByIds = async (ids: string[], userId: string) => {
 
 export const findLibraryItemById = async (
   id: string,
-  userId: string
+  userId: string,
+  options?: {
+    select?: (keyof LibraryItem)[]
+    relations?: {
+      user?: boolean
+      labels?: boolean
+      highlights?:
+        | {
+            user?: boolean
+          }
+        | boolean
+    }
+  }
 ): Promise<LibraryItem | null> => {
   return authTrx(
     async (tx) =>
-      tx
-        .createQueryBuilder(LibraryItem, 'library_item')
-        .leftJoinAndSelect('library_item.labels', 'labels')
-        .leftJoinAndSelect('library_item.highlights', 'highlights')
-        .leftJoinAndSelect('highlights.user', 'user')
-        .where('library_item.id = :id', { id })
-        .getOne(),
+      tx.withRepository(libraryItemRepository).findOne({
+        select: options?.select,
+        where: { id },
+        relations: options?.relations,
+      }),
     undefined,
     userId
   )
@@ -996,8 +1047,17 @@ export const createOrUpdateLibraryItem = async (
   libraryItem: CreateOrUpdateLibraryItemArgs,
   userId: string,
   pubsub = createPubSubClient(),
-  skipPubSub = false
+  skipPubSub = false,
+  originalContentUploaded = false
 ): Promise<LibraryItem> => {
+  let originalContent: string | null = null
+  if (libraryItem.originalContent) {
+    originalContent = libraryItem.originalContent
+
+    // remove original content from the item
+    delete libraryItem.originalContent
+  }
+
   const newLibraryItem = await authTrx(
     async (tx) => {
       const repo = tx.withRepository(libraryItemRepository)
@@ -1070,6 +1130,24 @@ export const createOrUpdateLibraryItem = async (
 
   const data = deepDelete(newLibraryItem, columnsToDelete)
   await pubsub.entityCreated<ItemEvent>(EntityType.ITEM, data, userId)
+
+  // upload original content to GCS in a job if it's not already uploaded
+  if (originalContent && !originalContentUploaded) {
+    try {
+      await enqueueUploadOriginalContent(
+        userId,
+        newLibraryItem.id,
+        newLibraryItem.savedAt,
+        originalContent
+      )
+
+      logger.info('Queued to upload original content in GCS', {
+        id: newLibraryItem.id,
+      })
+    } catch (error) {
+      logError(error)
+    }
+  }
 
   return newLibraryItem
 }
@@ -1225,6 +1303,11 @@ export const batchUpdateLibraryItems = async (
         savedAt: now,
       }
 
+      break
+    case BulkActionType.MarkAsSeen:
+      values = {
+        seenAt: now,
+      }
       break
     default:
       throw new Error('Invalid bulk action')
@@ -1644,4 +1727,42 @@ export const filterItemEvents = (
   }
 
   throw new Error('Unexpected state.')
+}
+
+export const enqueueUploadOriginalContent = async (
+  userId: string,
+  libraryItemId: string,
+  savedAt: Date,
+  originalContent: string
+) => {
+  const filePath = contentFilePath({
+    userId,
+    libraryItemId,
+    savedAt,
+    format: 'original',
+  })
+  await enqueueBulkUploadContentJob([
+    {
+      userId,
+      libraryItemId,
+      filePath,
+      format: 'original',
+      content: originalContent,
+    },
+  ])
+}
+
+export const downloadOriginalContent = async (
+  userId: string,
+  libraryItemId: string,
+  savedAt: Date
+) => {
+  return downloadFromBucket(
+    contentFilePath({
+      userId,
+      libraryItemId,
+      savedAt,
+      format: 'original',
+    })
+  )
 }

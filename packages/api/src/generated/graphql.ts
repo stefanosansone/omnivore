@@ -279,6 +279,7 @@ export enum BulkActionType {
   Archive = 'ARCHIVE',
   Delete = 'DELETE',
   MarkAsRead = 'MARK_AS_READ',
+  MarkAsSeen = 'MARK_AS_SEEN',
   MoveToFolder = 'MOVE_TO_FOLDER'
 }
 
@@ -805,6 +806,15 @@ export type DeviceTokensSuccess = {
   deviceTokens: Array<DeviceToken>;
 };
 
+export type DigestConfig = {
+  __typename?: 'DigestConfig';
+  channels?: Maybe<Array<Maybe<Scalars['String']>>>;
+};
+
+export type DigestConfigInput = {
+  channels?: InputMaybe<Array<InputMaybe<Scalars['String']>>>;
+};
+
 export enum DirectionalityType {
   Ltr = 'LTR',
   Rtl = 'RTL'
@@ -898,6 +908,13 @@ export type EmptyTrashSuccess = {
   __typename?: 'EmptyTrashSuccess';
   success?: Maybe<Scalars['Boolean']>;
 };
+
+export enum ErrorCode {
+  BadRequest = 'BAD_REQUEST',
+  Forbidden = 'FORBIDDEN',
+  NotFound = 'NOT_FOUND',
+  Unauthorized = 'UNAUTHORIZED'
+}
 
 export type ExportToIntegrationError = {
   __typename?: 'ExportToIntegrationError';
@@ -1215,6 +1232,24 @@ export type GroupsSuccess = {
   groups: Array<RecommendationGroup>;
 };
 
+export type HiddenHomeSectionError = {
+  __typename?: 'HiddenHomeSectionError';
+  errorCodes: Array<HiddenHomeSectionErrorCode>;
+};
+
+export enum HiddenHomeSectionErrorCode {
+  BadRequest = 'BAD_REQUEST',
+  Pending = 'PENDING',
+  Unauthorized = 'UNAUTHORIZED'
+}
+
+export type HiddenHomeSectionResult = HiddenHomeSectionError | HiddenHomeSectionSuccess;
+
+export type HiddenHomeSectionSuccess = {
+  __typename?: 'HiddenHomeSectionSuccess';
+  section?: Maybe<HomeSection>;
+};
+
 export type Highlight = {
   __typename?: 'Highlight';
   annotation?: Maybe<Scalars['String']>;
@@ -1260,6 +1295,80 @@ export enum HighlightType {
   Note = 'NOTE',
   Redaction = 'REDACTION'
 }
+
+export type HomeEdge = {
+  __typename?: 'HomeEdge';
+  cursor: Scalars['String'];
+  node: HomeSection;
+};
+
+export type HomeError = {
+  __typename?: 'HomeError';
+  errorCodes: Array<HomeErrorCode>;
+};
+
+export enum HomeErrorCode {
+  BadRequest = 'BAD_REQUEST',
+  Pending = 'PENDING',
+  Unauthorized = 'UNAUTHORIZED'
+}
+
+export type HomeItem = {
+  __typename?: 'HomeItem';
+  author?: Maybe<Scalars['String']>;
+  broadcastCount?: Maybe<Scalars['Int']>;
+  canArchive?: Maybe<Scalars['Boolean']>;
+  canComment?: Maybe<Scalars['Boolean']>;
+  canDelete?: Maybe<Scalars['Boolean']>;
+  canSave?: Maybe<Scalars['Boolean']>;
+  canShare?: Maybe<Scalars['Boolean']>;
+  date: Scalars['Date'];
+  dir?: Maybe<Scalars['String']>;
+  id: Scalars['ID'];
+  likeCount?: Maybe<Scalars['Int']>;
+  previewContent?: Maybe<Scalars['String']>;
+  saveCount?: Maybe<Scalars['Int']>;
+  score?: Maybe<Scalars['Float']>;
+  seen_at?: Maybe<Scalars['Date']>;
+  slug?: Maybe<Scalars['String']>;
+  source?: Maybe<HomeItemSource>;
+  thumbnail?: Maybe<Scalars['String']>;
+  title: Scalars['String'];
+  url: Scalars['String'];
+  wordCount?: Maybe<Scalars['Int']>;
+};
+
+export type HomeItemSource = {
+  __typename?: 'HomeItemSource';
+  icon?: Maybe<Scalars['String']>;
+  id?: Maybe<Scalars['ID']>;
+  name?: Maybe<Scalars['String']>;
+  type: HomeItemSourceType;
+  url?: Maybe<Scalars['String']>;
+};
+
+export enum HomeItemSourceType {
+  Library = 'LIBRARY',
+  Newsletter = 'NEWSLETTER',
+  Recommendation = 'RECOMMENDATION',
+  Rss = 'RSS'
+}
+
+export type HomeResult = HomeError | HomeSuccess;
+
+export type HomeSection = {
+  __typename?: 'HomeSection';
+  items: Array<HomeItem>;
+  layout?: Maybe<Scalars['String']>;
+  thumbnail?: Maybe<Scalars['String']>;
+  title?: Maybe<Scalars['String']>;
+};
+
+export type HomeSuccess = {
+  __typename?: 'HomeSuccess';
+  edges: Array<HomeEdge>;
+  pageInfo: PageInfo;
+};
 
 export type ImportFromIntegrationError = {
   __typename?: 'ImportFromIntegrationError';
@@ -1623,6 +1732,7 @@ export type Mutation = {
   optInFeature: OptInFeatureResult;
   recommend: RecommendResult;
   recommendHighlights: RecommendHighlightsResult;
+  refreshHome: RefreshHomeResult;
   replyToEmail: ReplyToEmailResult;
   reportItem: ReportItemResult;
   revokeApiKey: RevokeApiKeyResult;
@@ -2042,6 +2152,7 @@ export type OptInFeatureError = {
 
 export enum OptInFeatureErrorCode {
   BadRequest = 'BAD_REQUEST',
+  Ineligible = 'INELIGIBLE',
   NotFound = 'NOT_FOUND'
 }
 
@@ -2149,6 +2260,8 @@ export type Query = {
   getUserPersonalization: GetUserPersonalizationResult;
   groups: GroupsResult;
   hello?: Maybe<Scalars['String']>;
+  hiddenHomeSection: HiddenHomeSectionResult;
+  home: HomeResult;
   integration: IntegrationResult;
   integrations: IntegrationsResult;
   labels: LabelsResult;
@@ -2160,6 +2273,7 @@ export type Query = {
   scanFeeds: ScanFeedsResult;
   search: SearchResult;
   sendInstallInstructions: SendInstallInstructionsResult;
+  subscription: SubscriptionResult;
   subscriptions: SubscriptionsResult;
   typeaheadSearch: TypeaheadSearchResult;
   updatesSince: UpdatesSinceResult;
@@ -2197,6 +2311,12 @@ export type QueryGetDiscoverFeedArticlesArgs = {
 };
 
 
+export type QueryHomeArgs = {
+  after?: InputMaybe<Scalars['String']>;
+  first?: InputMaybe<Scalars['Int']>;
+};
+
+
 export type QueryIntegrationArgs = {
   name: Scalars['String'];
 };
@@ -2218,6 +2338,11 @@ export type QuerySearchArgs = {
   format?: InputMaybe<Scalars['String']>;
   includeContent?: InputMaybe<Scalars['Boolean']>;
   query?: InputMaybe<Scalars['String']>;
+};
+
+
+export type QuerySubscriptionArgs = {
+  id: Scalars['ID'];
 };
 
 
@@ -2418,6 +2543,22 @@ export type RecommendingUser = {
   profileImageURL?: Maybe<Scalars['String']>;
   userId: Scalars['String'];
   username: Scalars['String'];
+};
+
+export type RefreshHomeError = {
+  __typename?: 'RefreshHomeError';
+  errorCodes: Array<RefreshHomeErrorCode>;
+};
+
+export enum RefreshHomeErrorCode {
+  Pending = 'PENDING'
+}
+
+export type RefreshHomeResult = RefreshHomeError | RefreshHomeSuccess;
+
+export type RefreshHomeSuccess = {
+  __typename?: 'RefreshHomeSuccess';
+  success: Scalars['Boolean'];
 };
 
 export type Reminder = {
@@ -2769,6 +2910,8 @@ export type SearchItem = {
   readingProgressTopPercent?: Maybe<Scalars['Float']>;
   recommendations?: Maybe<Array<Recommendation>>;
   savedAt: Scalars['Date'];
+  score?: Maybe<Scalars['Float']>;
+  seenAt?: Maybe<Scalars['Date']>;
   shortId?: Maybe<Scalars['String']>;
   siteIcon?: Maybe<Scalars['String']>;
   siteName?: Maybe<Scalars['String']>;
@@ -3054,7 +3197,7 @@ export enum SetUserPersonalizationErrorCode {
 }
 
 export type SetUserPersonalizationInput = {
-  digestConfig?: InputMaybe<Scalars['JSON']>;
+  digestConfig?: InputMaybe<DigestConfigInput>;
   fields?: InputMaybe<Scalars['JSON']>;
   fontFamily?: InputMaybe<Scalars['String']>;
   fontSize?: InputMaybe<Scalars['Int']>;
@@ -3210,11 +3353,28 @@ export type Subscription = {
   url?: Maybe<Scalars['String']>;
 };
 
+export type SubscriptionError = {
+  __typename?: 'SubscriptionError';
+  errorCodes: Array<ErrorCode>;
+};
+
+export type SubscriptionResult = SubscriptionError | SubscriptionSuccess;
+
+export type SubscriptionRootType = {
+  __typename?: 'SubscriptionRootType';
+  hello?: Maybe<Scalars['String']>;
+};
+
 export enum SubscriptionStatus {
   Active = 'ACTIVE',
   Deleted = 'DELETED',
   Unsubscribed = 'UNSUBSCRIBED'
 }
+
+export type SubscriptionSuccess = {
+  __typename?: 'SubscriptionSuccess';
+  subscription: Subscription;
+};
 
 export enum SubscriptionType {
   Newsletter = 'NEWSLETTER',
@@ -3768,7 +3928,7 @@ export enum UserErrorCode {
 
 export type UserPersonalization = {
   __typename?: 'UserPersonalization';
-  digestConfig?: Maybe<Scalars['JSON']>;
+  digestConfig?: Maybe<DigestConfig>;
   fields?: Maybe<Scalars['JSON']>;
   fontFamily?: Maybe<Scalars['String']>;
   fontSize?: Maybe<Scalars['Int']>;
@@ -4083,6 +4243,8 @@ export type ResolversTypes = {
   DeviceTokensErrorCode: DeviceTokensErrorCode;
   DeviceTokensResult: ResolversTypes['DeviceTokensError'] | ResolversTypes['DeviceTokensSuccess'];
   DeviceTokensSuccess: ResolverTypeWrapper<DeviceTokensSuccess>;
+  DigestConfig: ResolverTypeWrapper<DigestConfig>;
+  DigestConfigInput: DigestConfigInput;
   DirectionalityType: DirectionalityType;
   DiscoverFeed: ResolverTypeWrapper<DiscoverFeed>;
   DiscoverFeedArticle: ResolverTypeWrapper<DiscoverFeedArticle>;
@@ -4100,6 +4262,7 @@ export type ResolversTypes = {
   EmptyTrashErrorCode: EmptyTrashErrorCode;
   EmptyTrashResult: ResolversTypes['EmptyTrashError'] | ResolversTypes['EmptyTrashSuccess'];
   EmptyTrashSuccess: ResolverTypeWrapper<EmptyTrashSuccess>;
+  ErrorCode: ErrorCode;
   ExportToIntegrationError: ResolverTypeWrapper<ExportToIntegrationError>;
   ExportToIntegrationErrorCode: ExportToIntegrationErrorCode;
   ExportToIntegrationResult: ResolversTypes['ExportToIntegrationError'] | ResolversTypes['ExportToIntegrationSuccess'];
@@ -4163,10 +4326,23 @@ export type ResolversTypes = {
   GroupsErrorCode: GroupsErrorCode;
   GroupsResult: ResolversTypes['GroupsError'] | ResolversTypes['GroupsSuccess'];
   GroupsSuccess: ResolverTypeWrapper<GroupsSuccess>;
+  HiddenHomeSectionError: ResolverTypeWrapper<HiddenHomeSectionError>;
+  HiddenHomeSectionErrorCode: HiddenHomeSectionErrorCode;
+  HiddenHomeSectionResult: ResolversTypes['HiddenHomeSectionError'] | ResolversTypes['HiddenHomeSectionSuccess'];
+  HiddenHomeSectionSuccess: ResolverTypeWrapper<HiddenHomeSectionSuccess>;
   Highlight: ResolverTypeWrapper<Highlight>;
   HighlightReply: ResolverTypeWrapper<HighlightReply>;
   HighlightStats: ResolverTypeWrapper<HighlightStats>;
   HighlightType: HighlightType;
+  HomeEdge: ResolverTypeWrapper<HomeEdge>;
+  HomeError: ResolverTypeWrapper<HomeError>;
+  HomeErrorCode: HomeErrorCode;
+  HomeItem: ResolverTypeWrapper<HomeItem>;
+  HomeItemSource: ResolverTypeWrapper<HomeItemSource>;
+  HomeItemSourceType: HomeItemSourceType;
+  HomeResult: ResolversTypes['HomeError'] | ResolversTypes['HomeSuccess'];
+  HomeSection: ResolverTypeWrapper<HomeSection>;
+  HomeSuccess: ResolverTypeWrapper<HomeSuccess>;
   ID: ResolverTypeWrapper<Scalars['ID']>;
   ImportFromIntegrationError: ResolverTypeWrapper<ImportFromIntegrationError>;
   ImportFromIntegrationErrorCode: ImportFromIntegrationErrorCode;
@@ -4276,6 +4452,10 @@ export type ResolversTypes = {
   Recommendation: ResolverTypeWrapper<Recommendation>;
   RecommendationGroup: ResolverTypeWrapper<RecommendationGroup>;
   RecommendingUser: ResolverTypeWrapper<RecommendingUser>;
+  RefreshHomeError: ResolverTypeWrapper<RefreshHomeError>;
+  RefreshHomeErrorCode: RefreshHomeErrorCode;
+  RefreshHomeResult: ResolversTypes['RefreshHomeError'] | ResolversTypes['RefreshHomeSuccess'];
+  RefreshHomeSuccess: ResolverTypeWrapper<RefreshHomeSuccess>;
   Reminder: ResolverTypeWrapper<Reminder>;
   ReminderError: ResolverTypeWrapper<ReminderError>;
   ReminderErrorCode: ReminderErrorCode;
@@ -4409,8 +4589,12 @@ export type ResolversTypes = {
   SubscribeInput: SubscribeInput;
   SubscribeResult: ResolversTypes['SubscribeError'] | ResolversTypes['SubscribeSuccess'];
   SubscribeSuccess: ResolverTypeWrapper<SubscribeSuccess>;
-  Subscription: ResolverTypeWrapper<{}>;
+  Subscription: ResolverTypeWrapper<Subscription>;
+  SubscriptionError: ResolverTypeWrapper<SubscriptionError>;
+  SubscriptionResult: ResolversTypes['SubscriptionError'] | ResolversTypes['SubscriptionSuccess'];
+  SubscriptionRootType: ResolverTypeWrapper<{}>;
   SubscriptionStatus: SubscriptionStatus;
+  SubscriptionSuccess: ResolverTypeWrapper<SubscriptionSuccess>;
   SubscriptionType: SubscriptionType;
   SubscriptionsError: ResolverTypeWrapper<SubscriptionsError>;
   SubscriptionsErrorCode: SubscriptionsErrorCode;
@@ -4647,6 +4831,8 @@ export type ResolversParentTypes = {
   DeviceTokensError: DeviceTokensError;
   DeviceTokensResult: ResolversParentTypes['DeviceTokensError'] | ResolversParentTypes['DeviceTokensSuccess'];
   DeviceTokensSuccess: DeviceTokensSuccess;
+  DigestConfig: DigestConfig;
+  DigestConfigInput: DigestConfigInput;
   DiscoverFeed: DiscoverFeed;
   DiscoverFeedArticle: DiscoverFeedArticle;
   DiscoverFeedError: DiscoverFeedError;
@@ -4710,9 +4896,19 @@ export type ResolversParentTypes = {
   GroupsError: GroupsError;
   GroupsResult: ResolversParentTypes['GroupsError'] | ResolversParentTypes['GroupsSuccess'];
   GroupsSuccess: GroupsSuccess;
+  HiddenHomeSectionError: HiddenHomeSectionError;
+  HiddenHomeSectionResult: ResolversParentTypes['HiddenHomeSectionError'] | ResolversParentTypes['HiddenHomeSectionSuccess'];
+  HiddenHomeSectionSuccess: HiddenHomeSectionSuccess;
   Highlight: Highlight;
   HighlightReply: HighlightReply;
   HighlightStats: HighlightStats;
+  HomeEdge: HomeEdge;
+  HomeError: HomeError;
+  HomeItem: HomeItem;
+  HomeItemSource: HomeItemSource;
+  HomeResult: ResolversParentTypes['HomeError'] | ResolversParentTypes['HomeSuccess'];
+  HomeSection: HomeSection;
+  HomeSuccess: HomeSuccess;
   ID: Scalars['ID'];
   ImportFromIntegrationError: ImportFromIntegrationError;
   ImportFromIntegrationResult: ResolversParentTypes['ImportFromIntegrationError'] | ResolversParentTypes['ImportFromIntegrationSuccess'];
@@ -4799,6 +4995,9 @@ export type ResolversParentTypes = {
   Recommendation: Recommendation;
   RecommendationGroup: RecommendationGroup;
   RecommendingUser: RecommendingUser;
+  RefreshHomeError: RefreshHomeError;
+  RefreshHomeResult: ResolversParentTypes['RefreshHomeError'] | ResolversParentTypes['RefreshHomeSuccess'];
+  RefreshHomeSuccess: RefreshHomeSuccess;
   Reminder: Reminder;
   ReminderError: ReminderError;
   ReminderResult: ResolversParentTypes['ReminderError'] | ResolversParentTypes['ReminderSuccess'];
@@ -4901,7 +5100,11 @@ export type ResolversParentTypes = {
   SubscribeInput: SubscribeInput;
   SubscribeResult: ResolversParentTypes['SubscribeError'] | ResolversParentTypes['SubscribeSuccess'];
   SubscribeSuccess: SubscribeSuccess;
-  Subscription: {};
+  Subscription: Subscription;
+  SubscriptionError: SubscriptionError;
+  SubscriptionResult: ResolversParentTypes['SubscriptionError'] | ResolversParentTypes['SubscriptionSuccess'];
+  SubscriptionRootType: {};
+  SubscriptionSuccess: SubscriptionSuccess;
   SubscriptionsError: SubscriptionsError;
   SubscriptionsResult: ResolversParentTypes['SubscriptionsError'] | ResolversParentTypes['SubscriptionsSuccess'];
   SubscriptionsSuccess: SubscriptionsSuccess;
@@ -5530,6 +5733,11 @@ export type DeviceTokensSuccessResolvers<ContextType = ResolverContext, ParentTy
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type DigestConfigResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['DigestConfig'] = ResolversParentTypes['DigestConfig']> = {
+  channels?: Resolver<Maybe<Array<Maybe<ResolversTypes['String']>>>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type DiscoverFeedResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['DiscoverFeed'] = ResolversParentTypes['DiscoverFeed']> = {
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -5856,6 +6064,20 @@ export type GroupsSuccessResolvers<ContextType = ResolverContext, ParentType ext
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type HiddenHomeSectionErrorResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HiddenHomeSectionError'] = ResolversParentTypes['HiddenHomeSectionError']> = {
+  errorCodes?: Resolver<Array<ResolversTypes['HiddenHomeSectionErrorCode']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type HiddenHomeSectionResultResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HiddenHomeSectionResult'] = ResolversParentTypes['HiddenHomeSectionResult']> = {
+  __resolveType: TypeResolveFn<'HiddenHomeSectionError' | 'HiddenHomeSectionSuccess', ParentType, ContextType>;
+};
+
+export type HiddenHomeSectionSuccessResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HiddenHomeSectionSuccess'] = ResolversParentTypes['HiddenHomeSectionSuccess']> = {
+  section?: Resolver<Maybe<ResolversTypes['HomeSection']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type HighlightResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['Highlight'] = ResolversParentTypes['Highlight']> = {
   annotation?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   color?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -5893,6 +6115,69 @@ export type HighlightReplyResolvers<ContextType = ResolverContext, ParentType ex
 
 export type HighlightStatsResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HighlightStats'] = ResolversParentTypes['HighlightStats']> = {
   highlightCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type HomeEdgeResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HomeEdge'] = ResolversParentTypes['HomeEdge']> = {
+  cursor?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  node?: Resolver<ResolversTypes['HomeSection'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type HomeErrorResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HomeError'] = ResolversParentTypes['HomeError']> = {
+  errorCodes?: Resolver<Array<ResolversTypes['HomeErrorCode']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type HomeItemResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HomeItem'] = ResolversParentTypes['HomeItem']> = {
+  author?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  broadcastCount?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  canArchive?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  canComment?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  canDelete?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  canSave?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  canShare?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  date?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
+  dir?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  likeCount?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  previewContent?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  saveCount?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  score?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  seen_at?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  slug?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  source?: Resolver<Maybe<ResolversTypes['HomeItemSource']>, ParentType, ContextType>;
+  thumbnail?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  title?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  url?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  wordCount?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type HomeItemSourceResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HomeItemSource'] = ResolversParentTypes['HomeItemSource']> = {
+  icon?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  id?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  name?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  type?: Resolver<ResolversTypes['HomeItemSourceType'], ParentType, ContextType>;
+  url?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type HomeResultResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HomeResult'] = ResolversParentTypes['HomeResult']> = {
+  __resolveType: TypeResolveFn<'HomeError' | 'HomeSuccess', ParentType, ContextType>;
+};
+
+export type HomeSectionResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HomeSection'] = ResolversParentTypes['HomeSection']> = {
+  items?: Resolver<Array<ResolversTypes['HomeItem']>, ParentType, ContextType>;
+  layout?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  thumbnail?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  title?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type HomeSuccessResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['HomeSuccess'] = ResolversParentTypes['HomeSuccess']> = {
+  edges?: Resolver<Array<ResolversTypes['HomeEdge']>, ParentType, ContextType>;
+  pageInfo?: Resolver<ResolversTypes['PageInfo'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -6171,6 +6456,7 @@ export type MutationResolvers<ContextType = ResolverContext, ParentType extends 
   optInFeature?: Resolver<ResolversTypes['OptInFeatureResult'], ParentType, ContextType, RequireFields<MutationOptInFeatureArgs, 'input'>>;
   recommend?: Resolver<ResolversTypes['RecommendResult'], ParentType, ContextType, RequireFields<MutationRecommendArgs, 'input'>>;
   recommendHighlights?: Resolver<ResolversTypes['RecommendHighlightsResult'], ParentType, ContextType, RequireFields<MutationRecommendHighlightsArgs, 'input'>>;
+  refreshHome?: Resolver<ResolversTypes['RefreshHomeResult'], ParentType, ContextType>;
   replyToEmail?: Resolver<ResolversTypes['ReplyToEmailResult'], ParentType, ContextType, RequireFields<MutationReplyToEmailArgs, 'recentEmailId' | 'reply'>>;
   reportItem?: Resolver<ResolversTypes['ReportItemResult'], ParentType, ContextType, RequireFields<MutationReportItemArgs, 'input'>>;
   revokeApiKey?: Resolver<ResolversTypes['RevokeApiKeyResult'], ParentType, ContextType, RequireFields<MutationRevokeApiKeyArgs, 'id'>>;
@@ -6294,6 +6580,8 @@ export type QueryResolvers<ContextType = ResolverContext, ParentType extends Res
   getUserPersonalization?: Resolver<ResolversTypes['GetUserPersonalizationResult'], ParentType, ContextType>;
   groups?: Resolver<ResolversTypes['GroupsResult'], ParentType, ContextType>;
   hello?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  hiddenHomeSection?: Resolver<ResolversTypes['HiddenHomeSectionResult'], ParentType, ContextType>;
+  home?: Resolver<ResolversTypes['HomeResult'], ParentType, ContextType, Partial<QueryHomeArgs>>;
   integration?: Resolver<ResolversTypes['IntegrationResult'], ParentType, ContextType, RequireFields<QueryIntegrationArgs, 'name'>>;
   integrations?: Resolver<ResolversTypes['IntegrationsResult'], ParentType, ContextType>;
   labels?: Resolver<ResolversTypes['LabelsResult'], ParentType, ContextType>;
@@ -6305,6 +6593,7 @@ export type QueryResolvers<ContextType = ResolverContext, ParentType extends Res
   scanFeeds?: Resolver<ResolversTypes['ScanFeedsResult'], ParentType, ContextType, RequireFields<QueryScanFeedsArgs, 'input'>>;
   search?: Resolver<ResolversTypes['SearchResult'], ParentType, ContextType, Partial<QuerySearchArgs>>;
   sendInstallInstructions?: Resolver<ResolversTypes['SendInstallInstructionsResult'], ParentType, ContextType>;
+  subscription?: Resolver<ResolversTypes['SubscriptionResult'], ParentType, ContextType, RequireFields<QuerySubscriptionArgs, 'id'>>;
   subscriptions?: Resolver<ResolversTypes['SubscriptionsResult'], ParentType, ContextType, Partial<QuerySubscriptionsArgs>>;
   typeaheadSearch?: Resolver<ResolversTypes['TypeaheadSearchResult'], ParentType, ContextType, RequireFields<QueryTypeaheadSearchArgs, 'query'>>;
   updatesSince?: Resolver<ResolversTypes['UpdatesSinceResult'], ParentType, ContextType, RequireFields<QueryUpdatesSinceArgs, 'since'>>;
@@ -6438,6 +6727,20 @@ export type RecommendingUserResolvers<ContextType = ResolverContext, ParentType 
   profileImageURL?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   userId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   username?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type RefreshHomeErrorResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['RefreshHomeError'] = ResolversParentTypes['RefreshHomeError']> = {
+  errorCodes?: Resolver<Array<ResolversTypes['RefreshHomeErrorCode']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type RefreshHomeResultResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['RefreshHomeResult'] = ResolversParentTypes['RefreshHomeResult']> = {
+  __resolveType: TypeResolveFn<'RefreshHomeError' | 'RefreshHomeSuccess', ParentType, ContextType>;
+};
+
+export type RefreshHomeSuccessResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['RefreshHomeSuccess'] = ResolversParentTypes['RefreshHomeSuccess']> = {
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -6641,6 +6944,8 @@ export type SearchItemResolvers<ContextType = ResolverContext, ParentType extend
   readingProgressTopPercent?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   recommendations?: Resolver<Maybe<Array<ResolversTypes['Recommendation']>>, ParentType, ContextType>;
   savedAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
+  score?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  seenAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   shortId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   siteIcon?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   siteName?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -6879,28 +7184,47 @@ export type SubscribeSuccessResolvers<ContextType = ResolverContext, ParentType 
 };
 
 export type SubscriptionResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = {
-  autoAddToLibrary?: SubscriptionResolver<Maybe<ResolversTypes['Boolean']>, "autoAddToLibrary", ParentType, ContextType>;
-  count?: SubscriptionResolver<ResolversTypes['Int'], "count", ParentType, ContextType>;
-  createdAt?: SubscriptionResolver<ResolversTypes['Date'], "createdAt", ParentType, ContextType>;
-  description?: SubscriptionResolver<Maybe<ResolversTypes['String']>, "description", ParentType, ContextType>;
-  failedAt?: SubscriptionResolver<Maybe<ResolversTypes['Date']>, "failedAt", ParentType, ContextType>;
-  fetchContent?: SubscriptionResolver<ResolversTypes['Boolean'], "fetchContent", ParentType, ContextType>;
-  fetchContentType?: SubscriptionResolver<ResolversTypes['FetchContentType'], "fetchContentType", ParentType, ContextType>;
-  folder?: SubscriptionResolver<ResolversTypes['String'], "folder", ParentType, ContextType>;
-  icon?: SubscriptionResolver<Maybe<ResolversTypes['String']>, "icon", ParentType, ContextType>;
-  id?: SubscriptionResolver<ResolversTypes['ID'], "id", ParentType, ContextType>;
-  isPrivate?: SubscriptionResolver<Maybe<ResolversTypes['Boolean']>, "isPrivate", ParentType, ContextType>;
-  lastFetchedAt?: SubscriptionResolver<Maybe<ResolversTypes['Date']>, "lastFetchedAt", ParentType, ContextType>;
-  mostRecentItemDate?: SubscriptionResolver<Maybe<ResolversTypes['Date']>, "mostRecentItemDate", ParentType, ContextType>;
-  name?: SubscriptionResolver<ResolversTypes['String'], "name", ParentType, ContextType>;
-  newsletterEmail?: SubscriptionResolver<Maybe<ResolversTypes['String']>, "newsletterEmail", ParentType, ContextType>;
-  refreshedAt?: SubscriptionResolver<Maybe<ResolversTypes['Date']>, "refreshedAt", ParentType, ContextType>;
-  status?: SubscriptionResolver<ResolversTypes['SubscriptionStatus'], "status", ParentType, ContextType>;
-  type?: SubscriptionResolver<ResolversTypes['SubscriptionType'], "type", ParentType, ContextType>;
-  unsubscribeHttpUrl?: SubscriptionResolver<Maybe<ResolversTypes['String']>, "unsubscribeHttpUrl", ParentType, ContextType>;
-  unsubscribeMailTo?: SubscriptionResolver<Maybe<ResolversTypes['String']>, "unsubscribeMailTo", ParentType, ContextType>;
-  updatedAt?: SubscriptionResolver<Maybe<ResolversTypes['Date']>, "updatedAt", ParentType, ContextType>;
-  url?: SubscriptionResolver<Maybe<ResolversTypes['String']>, "url", ParentType, ContextType>;
+  autoAddToLibrary?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['Date'], ParentType, ContextType>;
+  description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  failedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  fetchContent?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  fetchContentType?: Resolver<ResolversTypes['FetchContentType'], ParentType, ContextType>;
+  folder?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  icon?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  isPrivate?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  lastFetchedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  mostRecentItemDate?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  newsletterEmail?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  refreshedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  status?: Resolver<ResolversTypes['SubscriptionStatus'], ParentType, ContextType>;
+  type?: Resolver<ResolversTypes['SubscriptionType'], ParentType, ContextType>;
+  unsubscribeHttpUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  unsubscribeMailTo?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  updatedAt?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
+  url?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type SubscriptionErrorResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['SubscriptionError'] = ResolversParentTypes['SubscriptionError']> = {
+  errorCodes?: Resolver<Array<ResolversTypes['ErrorCode']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type SubscriptionResultResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['SubscriptionResult'] = ResolversParentTypes['SubscriptionResult']> = {
+  __resolveType: TypeResolveFn<'SubscriptionError' | 'SubscriptionSuccess', ParentType, ContextType>;
+};
+
+export type SubscriptionRootTypeResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['SubscriptionRootType'] = ResolversParentTypes['SubscriptionRootType']> = {
+  hello?: SubscriptionResolver<Maybe<ResolversTypes['String']>, "hello", ParentType, ContextType>;
+};
+
+export type SubscriptionSuccessResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['SubscriptionSuccess'] = ResolversParentTypes['SubscriptionSuccess']> = {
+  subscription?: Resolver<ResolversTypes['Subscription'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
 export type SubscriptionsErrorResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['SubscriptionsError'] = ResolversParentTypes['SubscriptionsError']> = {
@@ -7232,7 +7556,7 @@ export type UserErrorResolvers<ContextType = ResolverContext, ParentType extends
 };
 
 export type UserPersonalizationResolvers<ContextType = ResolverContext, ParentType extends ResolversParentTypes['UserPersonalization'] = ResolversParentTypes['UserPersonalization']> = {
-  digestConfig?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>;
+  digestConfig?: Resolver<Maybe<ResolversTypes['DigestConfig']>, ParentType, ContextType>;
   fields?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>;
   fontFamily?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   fontSize?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
@@ -7411,6 +7735,7 @@ export type Resolvers<ContextType = ResolverContext> = {
   DeviceTokensError?: DeviceTokensErrorResolvers<ContextType>;
   DeviceTokensResult?: DeviceTokensResultResolvers<ContextType>;
   DeviceTokensSuccess?: DeviceTokensSuccessResolvers<ContextType>;
+  DigestConfig?: DigestConfigResolvers<ContextType>;
   DiscoverFeed?: DiscoverFeedResolvers<ContextType>;
   DiscoverFeedArticle?: DiscoverFeedArticleResolvers<ContextType>;
   DiscoverFeedError?: DiscoverFeedErrorResolvers<ContextType>;
@@ -7468,9 +7793,19 @@ export type Resolvers<ContextType = ResolverContext> = {
   GroupsError?: GroupsErrorResolvers<ContextType>;
   GroupsResult?: GroupsResultResolvers<ContextType>;
   GroupsSuccess?: GroupsSuccessResolvers<ContextType>;
+  HiddenHomeSectionError?: HiddenHomeSectionErrorResolvers<ContextType>;
+  HiddenHomeSectionResult?: HiddenHomeSectionResultResolvers<ContextType>;
+  HiddenHomeSectionSuccess?: HiddenHomeSectionSuccessResolvers<ContextType>;
   Highlight?: HighlightResolvers<ContextType>;
   HighlightReply?: HighlightReplyResolvers<ContextType>;
   HighlightStats?: HighlightStatsResolvers<ContextType>;
+  HomeEdge?: HomeEdgeResolvers<ContextType>;
+  HomeError?: HomeErrorResolvers<ContextType>;
+  HomeItem?: HomeItemResolvers<ContextType>;
+  HomeItemSource?: HomeItemSourceResolvers<ContextType>;
+  HomeResult?: HomeResultResolvers<ContextType>;
+  HomeSection?: HomeSectionResolvers<ContextType>;
+  HomeSuccess?: HomeSuccessResolvers<ContextType>;
   ImportFromIntegrationError?: ImportFromIntegrationErrorResolvers<ContextType>;
   ImportFromIntegrationResult?: ImportFromIntegrationResultResolvers<ContextType>;
   ImportFromIntegrationSuccess?: ImportFromIntegrationSuccessResolvers<ContextType>;
@@ -7546,6 +7881,9 @@ export type Resolvers<ContextType = ResolverContext> = {
   Recommendation?: RecommendationResolvers<ContextType>;
   RecommendationGroup?: RecommendationGroupResolvers<ContextType>;
   RecommendingUser?: RecommendingUserResolvers<ContextType>;
+  RefreshHomeError?: RefreshHomeErrorResolvers<ContextType>;
+  RefreshHomeResult?: RefreshHomeResultResolvers<ContextType>;
+  RefreshHomeSuccess?: RefreshHomeSuccessResolvers<ContextType>;
   Reminder?: ReminderResolvers<ContextType>;
   ReminderError?: ReminderErrorResolvers<ContextType>;
   ReminderResult?: ReminderResultResolvers<ContextType>;
@@ -7626,6 +7964,10 @@ export type Resolvers<ContextType = ResolverContext> = {
   SubscribeResult?: SubscribeResultResolvers<ContextType>;
   SubscribeSuccess?: SubscribeSuccessResolvers<ContextType>;
   Subscription?: SubscriptionResolvers<ContextType>;
+  SubscriptionError?: SubscriptionErrorResolvers<ContextType>;
+  SubscriptionResult?: SubscriptionResultResolvers<ContextType>;
+  SubscriptionRootType?: SubscriptionRootTypeResolvers<ContextType>;
+  SubscriptionSuccess?: SubscriptionSuccessResolvers<ContextType>;
   SubscriptionsError?: SubscriptionsErrorResolvers<ContextType>;
   SubscriptionsResult?: SubscriptionsResultResolvers<ContextType>;
   SubscriptionsSuccess?: SubscriptionsSuccessResolvers<ContextType>;

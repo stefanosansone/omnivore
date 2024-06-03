@@ -1,3 +1,9 @@
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: SubscriptionRootType
+}
+
 directive @sanitize(allowedTags: [String], maxLength: Int, minLength: Int, pattern: String) on INPUT_FIELD_DEFINITION
 
 type AddDiscoverFeedError {
@@ -235,6 +241,7 @@ enum BulkActionType {
   ARCHIVE
   DELETE
   MARK_AS_READ
+  MARK_AS_SEEN
   MOVE_TO_FOLDER
 }
 
@@ -716,6 +723,14 @@ type DeviceTokensSuccess {
   deviceTokens: [DeviceToken!]!
 }
 
+type DigestConfig {
+  channels: [String]
+}
+
+input DigestConfigInput {
+  channels: [String]
+}
+
 enum DirectionalityType {
   LTR
   RTL
@@ -799,6 +814,13 @@ union EmptyTrashResult = EmptyTrashError | EmptyTrashSuccess
 
 type EmptyTrashSuccess {
   success: Boolean
+}
+
+enum ErrorCode {
+  BAD_REQUEST
+  FORBIDDEN
+  NOT_FOUND
+  UNAUTHORIZED
 }
 
 type ExportToIntegrationError {
@@ -1085,6 +1107,22 @@ type GroupsSuccess {
   groups: [RecommendationGroup!]!
 }
 
+type HiddenHomeSectionError {
+  errorCodes: [HiddenHomeSectionErrorCode!]!
+}
+
+enum HiddenHomeSectionErrorCode {
+  BAD_REQUEST
+  PENDING
+  UNAUTHORIZED
+}
+
+union HiddenHomeSectionResult = HiddenHomeSectionError | HiddenHomeSectionSuccess
+
+type HiddenHomeSectionSuccess {
+  section: HomeSection
+}
+
 type Highlight {
   annotation: String
   color: String
@@ -1126,6 +1164,74 @@ enum HighlightType {
   HIGHLIGHT
   NOTE
   REDACTION
+}
+
+type HomeEdge {
+  cursor: String!
+  node: HomeSection!
+}
+
+type HomeError {
+  errorCodes: [HomeErrorCode!]!
+}
+
+enum HomeErrorCode {
+  BAD_REQUEST
+  PENDING
+  UNAUTHORIZED
+}
+
+type HomeItem {
+  author: String
+  broadcastCount: Int
+  canArchive: Boolean
+  canComment: Boolean
+  canDelete: Boolean
+  canSave: Boolean
+  canShare: Boolean
+  date: Date!
+  dir: String
+  id: ID!
+  likeCount: Int
+  previewContent: String
+  saveCount: Int
+  score: Float
+  seen_at: Date
+  slug: String
+  source: HomeItemSource
+  thumbnail: String
+  title: String!
+  url: String!
+  wordCount: Int
+}
+
+type HomeItemSource {
+  icon: String
+  id: ID
+  name: String
+  type: HomeItemSourceType!
+  url: String
+}
+
+enum HomeItemSourceType {
+  LIBRARY
+  NEWSLETTER
+  RECOMMENDATION
+  RSS
+}
+
+union HomeResult = HomeError | HomeSuccess
+
+type HomeSection {
+  items: [HomeItem!]!
+  layout: String
+  thumbnail: String
+  title: String
+}
+
+type HomeSuccess {
+  edges: [HomeEdge!]!
+  pageInfo: PageInfo!
 }
 
 type ImportFromIntegrationError {
@@ -1461,6 +1567,7 @@ type Mutation {
   optInFeature(input: OptInFeatureInput!): OptInFeatureResult!
   recommend(input: RecommendInput!): RecommendResult!
   recommendHighlights(input: RecommendHighlightsInput!): RecommendHighlightsResult!
+  refreshHome: RefreshHomeResult!
   replyToEmail(recentEmailId: ID!, reply: AllowedReply!): ReplyToEmailResult!
   reportItem(input: ReportItemInput!): ReportItemResult!
   revokeApiKey(id: ID!): RevokeApiKeyResult!
@@ -1527,6 +1634,7 @@ type OptInFeatureError {
 
 enum OptInFeatureErrorCode {
   BAD_REQUEST
+  INELIGIBLE
   NOT_FOUND
 }
 
@@ -1629,6 +1737,8 @@ type Query {
   getUserPersonalization: GetUserPersonalizationResult!
   groups: GroupsResult!
   hello: String
+  hiddenHomeSection: HiddenHomeSectionResult!
+  home(after: String, first: Int): HomeResult!
   integration(name: String!): IntegrationResult!
   integrations: IntegrationsResult!
   labels: LabelsResult!
@@ -1640,6 +1750,7 @@ type Query {
   scanFeeds(input: ScanFeedsInput!): ScanFeedsResult!
   search(after: String, first: Int, format: String, includeContent: Boolean, query: String): SearchResult!
   sendInstallInstructions: SendInstallInstructionsResult!
+  subscription(id: ID!): SubscriptionResult!
   subscriptions(sort: SortParams, type: SubscriptionType): SubscriptionsResult!
   typeaheadSearch(first: Int, query: String!): TypeaheadSearchResult!
   updatesSince(after: String, first: Int, folder: String, since: Date!, sort: SortParams): UpdatesSinceResult!
@@ -1796,6 +1907,20 @@ type RecommendingUser {
   profileImageURL: String
   userId: String!
   username: String!
+}
+
+type RefreshHomeError {
+  errorCodes: [RefreshHomeErrorCode!]!
+}
+
+enum RefreshHomeErrorCode {
+  PENDING
+}
+
+union RefreshHomeResult = RefreshHomeError | RefreshHomeSuccess
+
+type RefreshHomeSuccess {
+  success: Boolean!
 }
 
 type Reminder {
@@ -2123,6 +2248,8 @@ type SearchItem {
   readingProgressTopPercent: Float
   recommendations: [Recommendation!]
   savedAt: Date!
+  score: Float
+  seenAt: Date
   shortId: String
   siteIcon: String
   siteName: String
@@ -2385,7 +2512,7 @@ enum SetUserPersonalizationErrorCode {
 }
 
 input SetUserPersonalizationInput {
-  digestConfig: JSON
+  digestConfig: DigestConfigInput
   fields: JSON
   fontFamily: String
   fontSize: Int
@@ -2532,10 +2659,24 @@ type Subscription {
   url: String
 }
 
+type SubscriptionError {
+  errorCodes: [ErrorCode!]!
+}
+
+union SubscriptionResult = SubscriptionError | SubscriptionSuccess
+
+type SubscriptionRootType {
+  hello: String
+}
+
 enum SubscriptionStatus {
   ACTIVE
   DELETED
   UNSUBSCRIBED
+}
+
+type SubscriptionSuccess {
+  subscription: Subscription!
 }
 
 enum SubscriptionType {
@@ -3045,7 +3186,7 @@ enum UserErrorCode {
 }
 
 type UserPersonalization {
-  digestConfig: JSON
+  digestConfig: DigestConfig
   fields: JSON
   fontFamily: String
   fontSize: Int

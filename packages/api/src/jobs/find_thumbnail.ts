@@ -5,7 +5,7 @@ import {
   findLibraryItemById,
   updateLibraryItem,
 } from '../services/library_item'
-import { createThumbnailUrl } from '../utils/imageproxy'
+import { createThumbnailProxyUrl } from '../utils/imageproxy'
 import { logger } from '../utils/logger'
 
 interface Data {
@@ -127,7 +127,9 @@ export const _findThumbnail = (imagesSizes: (ImageSize | null)[]) => {
 export const findThumbnail = async (data: Data) => {
   const { libraryItemId, userId } = data
 
-  const item = await findLibraryItemById(libraryItemId, userId)
+  const item = await findLibraryItemById(libraryItemId, userId, {
+    select: ['thumbnail', 'readableContent'],
+  })
   if (!item) {
     logger.info('page not found')
     return false
@@ -135,7 +137,7 @@ export const findThumbnail = async (data: Data) => {
 
   const thumbnail = item.thumbnail
   if (thumbnail) {
-    const proxyUrl = createThumbnailUrl(thumbnail)
+    const proxyUrl = createThumbnailProxyUrl(thumbnail)
     // pre-cache thumbnail first if exists
     const image = await fetchImage(proxyUrl)
     if (!image) {
