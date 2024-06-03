@@ -26,9 +26,6 @@ import app.omnivore.omnivore.core.network.model.CreateAccountParams
 import app.omnivore.omnivore.core.network.model.EmailLoginCredentials
 import app.omnivore.omnivore.core.network.model.EmailSignUpParams
 import app.omnivore.omnivore.core.network.model.SignInParams
-import app.omnivore.omnivore.core.network.retrofit.CreateAccountSubmit
-import app.omnivore.omnivore.core.network.retrofit.CreateEmailAccountSubmit
-import app.omnivore.omnivore.core.network.retrofit.RetrofitHelper
 import app.omnivore.omnivore.core.network.viewer
 import app.omnivore.omnivore.graphql.generated.ValidateUsernameQuery
 import app.omnivore.omnivore.utils.Constants
@@ -288,26 +285,28 @@ class LoginViewModel @Inject constructor(
         name: String,
     ) {
         viewModelScope.launch {
-            val request =
-                RetrofitHelper.getInstance(networker).create(CreateEmailAccountSubmit::class.java)
-
-            isLoading = true
             errorMessage = null
 
             val params = EmailSignUpParams(
                 email = email, password = password, name = name, username = username
             )
 
-            val result = request.submitCreateEmailAccount(params)
-
-            isLoading = false
-
-            if (result.errorBody() != null) {
-                errorMessage = resourceProvider.getString(
-                    R.string.login_view_model_something_went_wrong_two_error_msg
-                )
-            } else {
-                pendingEmailUserCreds = PendingEmailUserCreds(email, password)
+            accountRepository.submitCreateEmailAccount(params).collect {
+                when (it) {
+                    is Result.Success -> {
+                        isLoading = false
+                        pendingEmailUserCreds = PendingEmailUserCreds(email, password)
+                    }
+                    is Result.Error -> {
+                        isLoading = false
+                        errorMessage = resourceProvider.getString(
+                            R.string.login_view_model_something_went_wrong_two_error_msg
+                        )
+                    }
+                    Result.Loading -> {
+                        isLoading = true
+                    }
+                }
             }
         }
     }
@@ -318,8 +317,6 @@ class LoginViewModel @Inject constructor(
 
     fun submitProfile(username: String, name: String) {
         viewModelScope.launch {
-            val request =
-                RetrofitHelper.getInstance(networker).create(CreateAccountSubmit::class.java)
 
             isLoading = true
             errorMessage = null
@@ -331,23 +328,29 @@ class LoginViewModel @Inject constructor(
                 pendingUserToken = pendingUserToken, userProfile = userProfile
             )
 
-            val result = request.submitCreateAccount(params)
+            accountRepository.submitCreateAccount(params).collect {
+                when (it) {
+                    is Result.Success -> {
+                        isLoading = false
+                        datastoreRepository.putString(omnivoreAuthToken, it.data.authToken)
+                        datastoreRepository.putString(omnivoreAuthCookieString, it.data.authCookieString)
+                    }
+
+                    is Result.Error -> {
+                        isLoading = false
+                        errorMessage = resourceProvider.getString(
+                            R.string.login_view_model_something_went_wrong_two_error_msg
+                        )
+                    }
+
+                    Result.Loading -> {
+                        isLoading = true
+                    }
+                }
+            }
 
             isLoading = false
 
-            if (result.body()?.authToken != null) {
-                datastoreRepository.putString(omnivoreAuthToken, result.body()?.authToken!!)
-            } else {
-                errorMessage = resourceProvider.getString(
-                    R.string.login_view_model_something_went_wrong_error_msg
-                )
-            }
-
-            if (result.body()?.authCookieString != null) {
-                datastoreRepository.putString(
-                    omnivoreAuthCookieString, result.body()?.authCookieString!!
-                )
-            }
         }
     }
 

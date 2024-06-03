@@ -5,8 +5,10 @@ import app.omnivore.omnivore.core.common.result.asResult
 import app.omnivore.omnivore.core.data.repository.AccountRepository
 import app.omnivore.omnivore.core.network.NetworkDataSource
 import app.omnivore.omnivore.core.network.model.AuthPayload
+import app.omnivore.omnivore.core.network.model.CreateAccountParams
 import app.omnivore.omnivore.core.network.model.EmailAuthPayload
 import app.omnivore.omnivore.core.network.model.EmailLoginCredentials
+import app.omnivore.omnivore.core.network.model.EmailSignUpParams
 import app.omnivore.omnivore.core.network.model.PendingUserAuthPayload
 import app.omnivore.omnivore.core.network.model.SignInParams
 import kotlinx.coroutines.flow.Flow
@@ -29,5 +31,15 @@ class AccountRepositoryImpl @Inject constructor(
     override suspend fun submitPendingUser(params: SignInParams): Flow<Result<PendingUserAuthPayload>> =
         flow {
             emit(dataSource.submitPendingUser(params))
+        }.asResult()
+
+    override suspend fun submitCreateAccount(createAccountParams: CreateAccountParams): Flow<Result<AuthPayload>> =
+        flow {
+            emit(dataSource.submitCreateAccount(createAccountParams))
+        }.asResult()
+
+    override suspend fun submitCreateEmailAccount(params: EmailSignUpParams): Flow<Result<Unit>> =
+        flow {
+            emit(dataSource.submitCreateEmailAccount(params))
         }.asResult()
 }

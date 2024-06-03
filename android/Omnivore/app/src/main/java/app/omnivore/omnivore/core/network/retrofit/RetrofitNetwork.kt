@@ -3,19 +3,15 @@ package app.omnivore.omnivore.core.network.retrofit
 import app.omnivore.omnivore.core.network.NetworkDataSource
 import app.omnivore.omnivore.core.network.Networker
 import app.omnivore.omnivore.core.network.model.AuthPayload
+import app.omnivore.omnivore.core.network.model.CreateAccountParams
 import app.omnivore.omnivore.core.network.model.EmailAuthPayload
 import app.omnivore.omnivore.core.network.model.EmailLoginCredentials
+import app.omnivore.omnivore.core.network.model.EmailSignUpParams
 import app.omnivore.omnivore.core.network.model.PendingUserAuthPayload
 import app.omnivore.omnivore.core.network.model.SignInParams
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
-import kotlinx.serialization.json.Json
-import okhttp3.Call
-import okhttp3.MediaType.Companion.toMediaType
-import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
-import retrofit2.http.Headers
 import retrofit2.http.POST
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -36,6 +32,16 @@ interface RetrofitNetworkApi {
     suspend fun submitPendingUser(
         @Body params: SignInParams
     ): PendingUserAuthPayload
+
+    @POST("/api/mobile-auth/create-account")
+    suspend fun submitCreateAccount(
+        @Body params: CreateAccountParams
+    ): AuthPayload
+
+    @POST("/api/mobile-auth/email-sign-up")
+    suspend fun submitCreateEmailAccount(
+        @Body params: EmailSignUpParams
+    )
 }
 
 @Singleton
@@ -57,4 +63,11 @@ internal class RetrofitNetwork @Inject constructor(
 
     override suspend fun submitPendingUser(params: SignInParams): PendingUserAuthPayload =
         getRetrofitInstance().submitPendingUser(params)
+
+    override suspend fun submitCreateAccount(createAccountParams: CreateAccountParams): AuthPayload =
+        getRetrofitInstance().submitCreateAccount(createAccountParams)
+
+    override suspend fun submitCreateEmailAccount(params: EmailSignUpParams) {
+        getRetrofitInstance().submitCreateEmailAccount(params)
+    }
 }
