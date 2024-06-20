@@ -3,7 +3,6 @@ package app.omnivore.omnivore.feature.profile.tts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.omnivore.omnivore.core.datastore.DatastoreRepository
-import app.omnivore.omnivore.core.datastore.PreferencesKeys
 import app.omnivore.omnivore.core.datastore.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
