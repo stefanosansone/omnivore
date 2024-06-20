@@ -50,6 +50,9 @@ import app.omnivore.omnivore.feature.profile.SettingsScreen
 import app.omnivore.omnivore.feature.profile.about.AboutScreen
 import app.omnivore.omnivore.feature.profile.account.AccountScreen
 import app.omnivore.omnivore.feature.profile.filters.FiltersScreen
+import app.omnivore.omnivore.feature.profile.tts.LanguageScreen
+import app.omnivore.omnivore.feature.profile.tts.TextToSpeechScreen
+import app.omnivore.omnivore.feature.profile.tts.VoiceScreen
 import app.omnivore.omnivore.feature.web.WebViewScreen
 import app.omnivore.omnivore.navigation.Routes
 import app.omnivore.omnivore.navigation.TopLevelDestination
@@ -158,6 +161,18 @@ fun PrimaryNavigator(
 
         composable(Routes.Filters.route) {
             FiltersScreen(navController = navController)
+        }
+
+        composable(Routes.TextToSpeech.route) {
+            TextToSpeechScreen(navController = navController)
+        }
+
+        composable(Routes.DefaultLanguage.route) {
+            LanguageScreen(navController = navController)
+        }
+
+        composable(Routes.Voices.route) {
+            VoiceScreen(navController = navController)
         }
 
         composable(Routes.Account.route) {

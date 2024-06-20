@@ -7,6 +7,7 @@ import app.omnivore.omnivore.core.network.model.EmailLoginCredentials
 import app.omnivore.omnivore.core.network.model.EmailSignUpParams
 import app.omnivore.omnivore.core.network.model.PendingUserAuthPayload
 import app.omnivore.omnivore.core.network.model.SignInParams
+import app.omnivore.omnivore.core.network.model.speech.SpeechDocument
 
 interface NetworkDataSource {
     suspend fun submitEmailLogin(credentials: EmailLoginCredentials): EmailAuthPayload
@@ -18,4 +19,6 @@ interface NetworkDataSource {
     suspend fun submitCreateAccount(createAccountParams: CreateAccountParams): AuthPayload
 
     suspend fun submitCreateEmailAccount(params: EmailSignUpParams)
+
+    suspend fun getSpeech(itemId: String, currentVoice: String, secondaryVoice: String, priority: String, language: String?): SpeechDocument
 }

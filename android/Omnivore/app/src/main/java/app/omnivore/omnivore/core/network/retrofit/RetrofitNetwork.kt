@@ -9,10 +9,14 @@ import app.omnivore.omnivore.core.network.model.EmailLoginCredentials
 import app.omnivore.omnivore.core.network.model.EmailSignUpParams
 import app.omnivore.omnivore.core.network.model.PendingUserAuthPayload
 import app.omnivore.omnivore.core.network.model.SignInParams
+import app.omnivore.omnivore.core.network.model.speech.SpeechDocument
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,6 +46,15 @@ interface RetrofitNetworkApi {
     suspend fun submitCreateEmailAccount(
         @Body params: EmailSignUpParams
     )
+
+    @GET("/api/article/{itemID}/speech")
+    suspend fun getSpeech(
+        @Path("itemID") itemID: String,
+        @Query("voice") currentVoice: String,
+        @Query("secondaryVoice") secondaryVoice: String,
+        @Query("priority") priority: String,
+        @Query("language") language: String? = null
+    ): SpeechDocument
 }
 
 @Singleton
@@ -70,4 +83,21 @@ internal class RetrofitNetwork @Inject constructor(
     override suspend fun submitCreateEmailAccount(params: EmailSignUpParams) {
         getRetrofitInstance().submitCreateEmailAccount(params)
     }
+
+    override suspend fun getSpeech(
+        itemId: String,
+        currentVoice: String,
+        secondaryVoice: String,
+        priority: String,
+        language: String?
+    ): SpeechDocument {
+        return getRetrofitInstance().getSpeech(
+            itemId,
+            currentVoice,
+            secondaryVoice,
+            priority,
+            language
+        )
+    }
+
 }

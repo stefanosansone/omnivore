@@ -205,6 +205,12 @@
     <!-- Filters -->
     <string name="hide_following_tab">Hide following tab</string>
 
+    <!-- TTS -->
+    <string name="tts_default_launguage">Default language</string>
+    <string name="tts_voices">Voices</string>
+    <string name="tts_choose_a_voice">Choose a Voice</string>
+    <string name="tts_use_ultra_realistic_voices">Use Ultra Realistic Voices</string>
+
     <!-- ManageAccount -->
     <string name="manage_account_title">Manage Account</string>
     <string name="manage_account_action_reset_data_cache">Reset Data Cache</string>
@@ -220,6 +226,7 @@
     <string name="about_terms_and_conditions">Terms and Conditions</string>
 
     <string name="profile_filters">Filters</string>
+    <string name="profile_text_to_speech">Text to speech</string>
     <string name="profile_manage_account">Manage Account</string>
     <string name="about_logout">Logout</string>
 

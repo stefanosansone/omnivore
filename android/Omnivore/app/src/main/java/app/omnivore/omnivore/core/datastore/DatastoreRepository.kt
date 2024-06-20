@@ -1,6 +1,7 @@
 package app.omnivore.omnivore.core.datastore
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -17,10 +18,13 @@ import javax.inject.Inject
 interface DatastoreRepository {
     val hasAuthTokenFlow: Flow<Boolean>
     val themeKeyFlow: Flow<String>
+    val userPreferencesFlow: Flow<UserPreferences>
 
+    suspend fun updateUseUltraRealisticVoices(useUrv: Boolean)
+    suspend fun updateEnglishVoice(voice: String)
     suspend fun clear()
     suspend fun putBoolean(key: String, value: Boolean)
-    fun getBoolean(key: String): Flow<Boolean>
+    suspend fun getBoolean(key: String): Boolean
     suspend fun putString(key: String, value: String)
     suspend fun putInt(key: String, value: Int)
     suspend fun getString(key: String): String?
@@ -35,6 +39,25 @@ class OmnivoreDatastore @Inject constructor(
         name = Constants.dataStoreName
     )
 
+    override val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
+        .map { preferences ->
+            val ttsUrv = preferences[PreferencesKeys.TTS_URV]?: false
+            val ttsEnglishVoice = preferences[PreferencesKeys.TTS_ENGLISH_VOICE]?: "en"
+            UserPreferences(ttsUrv, ttsEnglishVoice)
+        }
+
+    override suspend fun updateUseUltraRealisticVoices(useUrv: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.TTS_URV] = useUrv
+        }
+    }
+
+    override suspend fun updateEnglishVoice(voice: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.TTS_ENGLISH_VOICE] = voice
+        }
+    }
+
     override suspend fun putBoolean(key: String, value: Boolean) {
         val preferencesKey = booleanPreferencesKey(key)
         context.dataStore.edit { preferences ->
@@ -42,11 +65,10 @@ class OmnivoreDatastore @Inject constructor(
         }
     }
 
-    override fun getBoolean(key: String): Flow<Boolean> {
+    override suspend fun getBoolean(key: String): Boolean {
         val preferencesKey = booleanPreferencesKey(key)
-        return context.dataStore.data.map { preferences ->
-            preferences[preferencesKey] ?: false
-        }
+        val preferences = context.dataStore.data.first()
+        return preferences[preferencesKey] ?: false
     }
 
     override suspend fun putString(key: String, value: String) {

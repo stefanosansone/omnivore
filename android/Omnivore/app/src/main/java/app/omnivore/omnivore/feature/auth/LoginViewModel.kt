@@ -41,6 +41,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -89,10 +90,12 @@ class LoginViewModel @Inject constructor(
 
     val registrationStateLiveData = MutableLiveData(RegistrationState.SocialLogin)
 
-    val followingTabActiveState: StateFlow<Boolean> = datastoreRepository.getBoolean(
-        followingTabActive
-    ).stateIn(
-        scope = viewModelScope, started = SharingStarted.Lazily, initialValue = true
+    val followingTabActiveState: StateFlow<Boolean> = flow {
+        emit(datastoreRepository.getBoolean(followingTabActive))
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(),
+        initialValue = false
     )
 
     fun setSelfHostingDetails(context: Context, apiServer: String, webServer: String) {

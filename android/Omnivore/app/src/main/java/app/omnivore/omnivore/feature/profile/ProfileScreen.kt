@@ -67,6 +67,13 @@ fun SettingsViewContent(
             )
         }
 
+        item {
+            TextPreferenceWidget(
+                title = stringResource(R.string.profile_text_to_speech),
+                onPreferenceClick = { navController.navigate(Routes.TextToSpeech.route) },
+            )
+        }
+
         item { HorizontalDivider() }
 
         item {

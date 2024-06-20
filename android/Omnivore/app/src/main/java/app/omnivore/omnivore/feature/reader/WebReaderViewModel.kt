@@ -25,6 +25,7 @@ import app.omnivore.omnivore.core.database.dao.SavedItemDao
 import app.omnivore.omnivore.core.database.entities.SavedItem
 import app.omnivore.omnivore.core.database.entities.SavedItemLabel
 import app.omnivore.omnivore.core.datastore.DatastoreRepository
+import app.omnivore.omnivore.core.datastore.followingTabActive
 import app.omnivore.omnivore.core.datastore.preferredTheme
 import app.omnivore.omnivore.core.datastore.preferredWebFontFamily
 import app.omnivore.omnivore.core.datastore.preferredWebFontSize
@@ -53,6 +54,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -567,9 +569,9 @@ class WebReaderViewModel @Inject constructor(
         enqueueScript(script)
     }
 
-    val volumeRockerForScrollState: StateFlow<Boolean> = datastoreRepository.getBoolean(
-        volumeForScroll
-    ).stateIn(
+    val volumeRockerForScrollState: StateFlow<Boolean> = flow {
+        emit(datastoreRepository.getBoolean(volumeForScroll))
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Lazily,
         initialValue = false
