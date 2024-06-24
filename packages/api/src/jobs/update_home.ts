@@ -1,17 +1,19 @@
+import client from 'prom-client'
 import { LibraryItem } from '../entity/library_item'
 import { PublicItem } from '../entity/public_item'
-import { Subscription } from '../entity/subscription'
+import { Subscription, SubscriptionType } from '../entity/subscription'
 import { User } from '../entity/user'
+import { registerMetric } from '../prometheus'
 import { redisDataSource } from '../redis_data_source'
 import { findUnseenPublicItems } from '../services/home'
 import { searchLibraryItems } from '../services/library_item'
-import { Feature, getScores } from '../services/score'
+import { Feature, scoreClient } from '../services/score'
 import { findSubscriptionsByNames } from '../services/subscriptions'
 import { findActiveUser } from '../services/user'
 import { lanaugeToCode } from '../utils/helpers'
 import { logError, logger } from '../utils/logger'
 
-export const UPDATE_HOME_JOB = 'UPDATE_HOME_JOB'
+export const UPDATE_HOME_JOB = 'update-home'
 
 export interface UpdateHomeJobData {
   userId: string
@@ -39,6 +41,9 @@ interface Candidate {
   subscription?: {
     name: string
     type: string
+    autoAddToLibrary?: boolean | null
+    createdAt: Date
+    fetchContent?: boolean | null
   }
 }
 
@@ -100,6 +105,7 @@ const publicItemToCandidate = (item: PublicItem): Candidate => ({
   subscription: {
     name: item.source.name,
     type: item.source.type,
+    createdAt: item.source.createdAt,
   },
   score: 0,
 })
@@ -220,12 +226,26 @@ const rankCandidates = async (
         word_count: item.wordCount,
         published_at: item.publishedAt,
         subscription: item.subscription?.name,
+        inbox_folder: item.folder === 'inbox',
+        is_feed: item.subscription?.type === SubscriptionType.Rss,
+        is_newsletter: item.subscription?.type === SubscriptionType.Newsletter,
+        is_subscription: !!item.subscription,
+        item_word_count: item.wordCount,
+        subscription_count: 0,
+        subscription_auto_add_to_library: item.subscription?.autoAddToLibrary,
+        subscription_fetch_content: item.subscription?.fetchContent,
+        days_since_subscribed: item.subscription
+          ? Math.floor(
+              (Date.now() - item.subscription.createdAt.getTime()) /
+                (1000 * 60 * 60 * 24)
+            )
+          : undefined,
       } as Feature
       return acc
     }, {} as Record<string, Feature>),
   }
 
-  const scores = await getScores(data)
+  const scores = await scoreClient.getScores(data)
   // update scores for candidates
   candidates.forEach((item) => {
     item.score = scores[item.id]['score'] || 0
@@ -434,6 +454,18 @@ const mixHomeItems = (
   return sections
 }
 
+// use prometheus to monitor the latency of each step
+const latency = new client.Histogram({
+  name: 'omnivore_update_home_latency',
+  help: 'Latency of update home job',
+  labelNames: ['step'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10],
+})
+
+latency.observe(10)
+
+registerMetric(latency)
+
 export const updateHome = async (data: UpdateHomeJobData) => {
   const { userId, cursor } = data
   logger.info('Updating home for user', data)
@@ -447,22 +479,19 @@ export const updateHome = async (data: UpdateHomeJobData) => {
 
     logger.info(`Updating home for user ${userId}`)
 
-    logger.profile('justAdded')
+    let end = latency.startTimer({ step: 'justAdded' })
     const justAddedCandidates = await getJustAddedCandidates(userId)
-    logger.profile('justAdded', {
-      level: 'info',
-      message: `Found ${justAddedCandidates.length} just added candidates`,
-    })
+    end()
 
-    logger.profile('selecting')
+    logger.info(`Found ${justAddedCandidates.length} just added candidates`)
+
+    end = latency.startTimer({ step: 'select' })
     const candidates = await selectCandidates(
       user,
       justAddedCandidates.map((c) => c.id)
     )
-    logger.profile('selecting', {
-      level: 'info',
-      message: `Found ${candidates.length} candidates`,
-    })
+    end()
+    logger.info(`Found ${candidates.length} candidates`)
 
     if (!justAddedCandidates.length && !candidates.length) {
       logger.info('No candidates found')
@@ -471,26 +500,21 @@ export const updateHome = async (data: UpdateHomeJobData) => {
 
     // TODO: integrity check on candidates
 
-    logger.profile('ranking')
+    end = latency.startTimer({ step: 'ranking' })
     const rankedCandidates = await rankCandidates(userId, candidates)
-    logger.profile('ranking', {
-      level: 'info',
-      message: `Ranked ${rankedCandidates.length} candidates`,
-    })
+    end()
 
-    logger.profile('mixing')
+    logger.info(`Ranked ${rankedCandidates.length} candidates`)
+
+    end = latency.startTimer({ step: 'mixing' })
     const sections = mixHomeItems(justAddedCandidates, rankedCandidates)
-    logger.profile('mixing', {
-      level: 'info',
-      message: `Created ${sections.length} sections`,
-    })
+    end()
 
-    logger.profile('saving')
+    logger.info(`Mixed ${sections.length} sections`)
+
+    end = latency.startTimer({ step: 'saving' })
     await appendSectionsToHome(userId, sections, cursor)
-    logger.profile('saving', {
-      level: 'info',
-      message: 'Sections appended to home',
-    })
+    end()
 
     logger.info('Home updated for user', { userId })
   } catch (error) {

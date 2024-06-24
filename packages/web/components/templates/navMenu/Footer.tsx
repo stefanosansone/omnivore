@@ -17,22 +17,16 @@ export const NavMenuFooter = (props: NavMenuFooterProps): JSX.Element => {
         position: 'fixed',
         bottom: '0%',
         alignItems: 'center',
-        backgroundColor: '$thBackground2',
+        bg: '$thNavMenuFooter',
         width: LIBRARY_LEFT_MENU_WIDTH,
         overflowY: 'auto',
         overflowX: 'hidden',
         '&::-webkit-scrollbar': {
           display: 'none',
         },
-        '@mdDown': {
-          width: '100%',
-        },
       }}
     >
-      <PrimaryDropdown
-        showThemeSection={!props.showFullThemeSection ?? true}
-        showFullThemeSection={props.showFullThemeSection ?? false}
-      />
+      <PrimaryDropdown />
       <SpanBox
         css={{
           marginLeft: 'auto',

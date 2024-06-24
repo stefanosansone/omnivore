@@ -436,7 +436,14 @@ export const Button = styled('button', {
         cursor: 'pointer',
         p: '5px',
         borderRadius: '5px',
-        '&:hover': { bg: '$readerHoverBg', opacity: '1' },
+        '&:hover': { bg: '$homeActionHoverBg', opacity: '1' },
+      },
+      menuAction: {
+        display: 'flex',
+        border: 'none',
+        bg: 'transparent',
+        cursor: 'pointer',
+        '&:hover': { bg: 'transparent', opacity: '1' },
       },
       themeSwitch: {
         p: '0px',

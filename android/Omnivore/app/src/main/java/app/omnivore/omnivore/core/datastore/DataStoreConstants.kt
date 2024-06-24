@@ -21,6 +21,7 @@ const val lastUsedSavedItemSortFilter = "lastUsedSavedItemSortFilter"
 const val preferredTheme = "preferredTheme"
 const val followingTabActive = "followingTabActive"
 const val volumeForScroll = "volumeForScroll"
+const val rtlText = "rtlText"
 
 object PreferencesKeys {
     val TTS_URV = booleanPreferencesKey("tts_urv")
