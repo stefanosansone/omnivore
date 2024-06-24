@@ -38,7 +38,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import app.omnivore.omnivore.R
-import app.omnivore.omnivore.core.designsystem.component.DividerWithText
+import app.omnivore.omnivore.core.ui.DividerWithText
 import app.omnivore.omnivore.feature.onboarding.OnboardingViewModel
 import app.omnivore.omnivore.feature.theme.OmnivoreTheme
 import app.omnivore.omnivore.navigation.Routes

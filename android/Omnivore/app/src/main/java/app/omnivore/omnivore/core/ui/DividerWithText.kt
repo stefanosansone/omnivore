@@ -1,4 +1,4 @@
-package app.omnivore.omnivore.core.designsystem.component
+package app.omnivore.omnivore.core.ui
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth

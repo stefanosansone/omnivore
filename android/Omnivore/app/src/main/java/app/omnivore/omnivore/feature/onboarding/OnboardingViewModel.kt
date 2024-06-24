@@ -88,8 +88,6 @@ class OnboardingViewModel @Inject constructor(
             scope = viewModelScope, started = SharingStarted.Lazily, initialValue = true
         )
 
-    val registrationStateLiveData = MutableLiveData(RegistrationState.SocialLogin)
-
     val followingTabActiveState: StateFlow<Boolean> = flow {
         emit(datastoreRepository.getBoolean(followingTabActive))
     }.stateIn(
@@ -270,9 +268,7 @@ class OnboardingViewModel @Inject constructor(
                     }
 
                     is Result.Error -> {
-                        errorMessage = resourceProvider.getString(
-                            R.string.login_view_model_something_went_wrong_error_msg
-                        )
+                        setErrorMessage(resourceProvider.getString(R.string.login_view_model_something_went_wrong_error_msg))
                     }
 
                     Result.Loading -> {

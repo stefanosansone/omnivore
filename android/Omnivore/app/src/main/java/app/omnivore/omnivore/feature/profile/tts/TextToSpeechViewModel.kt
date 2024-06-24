@@ -7,7 +7,6 @@ import app.omnivore.omnivore.core.datastore.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -17,14 +16,10 @@ class TextToSpeechViewModel @Inject constructor(
     private val datastoreRepository: DatastoreRepository
 ) : ViewModel() {
 
-    val uiState: StateFlow<TextToSpeechUiState> = combine(
-        selectedTopicId,
-        getFollowableTopics(sortBy = TopicSortField.NAME),
-        InterestsUiState::Interests,
-    ).stateIn(
+    val uiState: StateFlow<TextToSpeechUiState> = a.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = InterestsUiState.Loading,
+        initialValue = TextToSpeechUiState.Loading,
     )
 
     val userPreferencesState: StateFlow<UserPreferences> = datastoreRepository.userPreferencesFlow.stateIn(
@@ -49,9 +44,8 @@ class TextToSpeechViewModel @Inject constructor(
 sealed interface TextToSpeechUiState {
     data object Loading : TextToSpeechUiState
 
-    data class Interests(
-        val selectedTopicId: String?,
-        val topics: List<FollowableTopic>,
+    data class TextToSpeech(
+        val test
     ) : TextToSpeechUiState
 
     data object Empty : TextToSpeechUiState
