@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { createHmac } from 'crypto'
+import * as httpContext from 'express-http-context2'
 import { isError } from 'lodash'
 import { Highlight } from '../entity/highlight'
 import { LibraryItem, LibraryItemState } from '../entity/library_item'
@@ -11,6 +12,7 @@ import {
   EXISTING_NEWSLETTER_FOLDER,
   NewsletterEmail,
 } from '../entity/newsletter_email'
+import { Post } from '../entity/post'
 import { PublicItem } from '../entity/public_item'
 import { Recommendation } from '../entity/recommendation'
 import {
@@ -150,6 +152,13 @@ import {
   webhookResolver,
   webhooksResolver,
 } from './index'
+import {
+  createPostResolver,
+  deletePostResolver,
+  postResolver,
+  postsResolver,
+  updatePostResolver,
+} from './posts'
 import {
   markEmailAsItemResolver,
   recentEmailsResolver,
@@ -316,6 +325,9 @@ export const functionResolvers = {
     createFolderPolicy: createFolderPolicyResolver,
     updateFolderPolicy: updateFolderPolicyResolver,
     deleteFolderPolicy: deleteFolderPolicyResolver,
+    createPost: createPostResolver,
+    updatePost: updatePostResolver,
+    deletePost: deletePostResolver,
   },
   Query: {
     me: getMeUserResolver,
@@ -352,17 +364,31 @@ export const functionResolvers = {
     hiddenHomeSection: hiddenHomeSectionResolver,
     highlights: highlightsResolver,
     folderPolicies: folderPoliciesResolver,
+    posts: postsResolver,
+    post: postResolver,
   },
   User: {
     async intercomHash(user: User) {
-      if (env.intercom.secretKey) {
-        const userIdentifier = user.id.toString()
+      let secret: string
 
-        return createHmac('sha256', env.intercom.secretKey)
-          .update(userIdentifier)
-          .digest('hex')
+      const client = httpContext.get('client') as string
+      switch (client.toLowerCase()) {
+        case 'ios':
+          secret = env.intercom.iosSecret
+          break
+        case 'android':
+          secret = env.intercom.androidSecret
+          break
+        default:
+          secret = env.intercom.webSecret
       }
-      return undefined
+
+      if (!secret) {
+        return undefined
+      }
+
+      const userIdentifier = user.id
+      return createHmac('sha256', secret).update(userIdentifier).digest('hex')
     },
     async features(_: User, __: Record<string, unknown>, ctx: ResolverContext) {
       if (!ctx.claims?.uid) {
@@ -432,7 +458,7 @@ export const functionResolvers = {
       if (article.wordCount) return article.wordCount
 
       return article.readableContent
-        ? wordsCount(article.readableContent)
+        ? wordsCount(article.readableContent, true)
         : undefined
     },
     async labels(article: LibraryItem, _: unknown, ctx: ResolverContext) {
@@ -499,7 +525,9 @@ export const functionResolvers = {
     },
     wordsCount(item: LibraryItem) {
       if (item.wordCount) return item.wordCount
-      return item.readableContent ? wordsCount(item.readableContent) : undefined
+      return item.readableContent
+        ? wordsCount(item.readableContent, true)
+        : undefined
     },
     siteIcon(item: LibraryItem) {
       if (item.siteIcon && !isBase64Image(item.siteIcon)) {
@@ -678,6 +706,7 @@ export const functionResolvers = {
               siteIcon: libraryItem.siteIcon,
               slug: libraryItem.slug,
               score: item.score,
+              canMove: libraryItem.folder === 'following',
             }
           }
 
@@ -775,6 +804,35 @@ export const functionResolvers = {
     },
     name: (recommendation: Recommendation) => recommendation.group.name,
     recommendedAt: (recommendation: Recommendation) => recommendation.createdAt,
+  },
+  Post: {
+    async author(post: Post, _: never, ctx: ResolverContext) {
+      const author = await ctx.dataLoaders.users.load(post.userId)
+      return author?.name
+    },
+    ownedByViewer(post: Post, _: never, ctx: ResolverContext) {
+      return post.userId === ctx.claims?.uid
+    },
+    async libraryItems(
+      post: { libraryItemIds: string[] },
+      _: never,
+      ctx: ResolverContext
+    ) {
+      const items = await ctx.dataLoaders.libraryItems.loadMany(
+        post.libraryItemIds
+      )
+      return items.filter((item) => !!item)
+    },
+    async highlights(
+      post: { highlightIds: string[] },
+      _: never,
+      ctx: ResolverContext
+    ) {
+      const highlights = await ctx.dataLoaders.highlights.loadMany(
+        post.highlightIds
+      )
+      return highlights.filter((highlight) => !!highlight)
+    },
   },
   ...resultResolveTypeResolver('Login'),
   ...resultResolveTypeResolver('LogOut'),
@@ -874,4 +932,9 @@ export const functionResolvers = {
   ...resultResolveTypeResolver('CreateFolderPolicy'),
   ...resultResolveTypeResolver('UpdateFolderPolicy'),
   ...resultResolveTypeResolver('DeleteFolderPolicy'),
+  ...resultResolveTypeResolver('Posts'),
+  ...resultResolveTypeResolver('Post'),
+  ...resultResolveTypeResolver('CreatePost'),
+  ...resultResolveTypeResolver('UpdatePost'),
+  ...resultResolveTypeResolver('DeletePost'),
 }

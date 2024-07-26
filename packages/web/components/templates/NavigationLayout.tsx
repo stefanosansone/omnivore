@@ -17,7 +17,6 @@ import { ThemeId, theme } from '../tokens/stitches.config'
 import { NavigationMenu } from './navMenu/NavigationMenu'
 import { Button } from '../elements/Button'
 import { List } from '@phosphor-icons/react'
-import { usePersistedState } from '../../lib/hooks/usePersistedState'
 import { LIBRARY_LEFT_MENU_WIDTH } from './navMenu/LibraryLegacyMenu'
 import { AddLinkModal } from './AddLinkModal'
 import { saveUrlMutation } from '../../lib/networking/mutations/saveUrlMutation'
@@ -25,6 +24,7 @@ import {
   showErrorToast,
   showSuccessToastWithAction,
 } from '../../lib/toastHelpers'
+import useWindowDimensions from '../../lib/hooks/useGetWindowDimensions'
 
 export type NavigationSection =
   | 'home'
@@ -39,6 +39,9 @@ type NavigationLayoutProps = {
   rightPane?: ReactNode
   section: NavigationSection
   pageMetaDataProps?: PageMetaDataProps
+
+  showNavigationMenu: boolean
+  setShowNavigationMenu: (show: boolean) => void
 }
 
 export function NavigationLayout(props: NavigationLayoutProps): JSX.Element {
@@ -50,13 +53,7 @@ export function NavigationLayout(props: NavigationLayoutProps): JSX.Element {
   const [showKeyboardCommandsModal, setShowKeyboardCommandsModal] =
     useState(false)
 
-  const [showNavMenu, setShowNavMenu, isLoading] = usePersistedState<boolean>({
-    key: 'nav-show-menu',
-    isSessionStorage: false,
-    initialValue: true,
-  })
-
-  useKeyboardShortcuts(navigationCommands(router))
+  useRegisterActions(navigationCommands(router))
 
   useKeyboardShortcuts(
     primaryCommands((action) => {
@@ -68,38 +65,6 @@ export function NavigationLayout(props: NavigationLayoutProps): JSX.Element {
     })
   )
 
-  useRegisterActions(
-    [
-      {
-        id: 'home',
-        section: 'Navigation',
-        name: 'Go to Home (Library) ',
-        shortcut: ['g h'],
-        keywords: 'go home',
-        perform: () => router?.push('/home'),
-      },
-      {
-        id: 'lightTheme',
-        section: 'Preferences',
-        name: 'Change theme (light) ',
-        shortcut: ['v', 'l'],
-        keywords: 'light theme',
-        priority: Priority.LOW,
-        perform: () => updateTheme(ThemeId.Light),
-      },
-      {
-        id: 'darkTheme',
-        section: 'Preferences',
-        name: 'Change theme (dark) ',
-        shortcut: ['v', 'd'],
-        keywords: 'dark theme',
-        priority: Priority.LOW,
-        perform: () => updateTheme(ThemeId.Dark),
-      },
-    ],
-    [router]
-  )
-
   // Attempt to identify the user if they are logged in.
   useEffect(() => {
     setupAnalytics(viewerData?.me)
@@ -108,6 +73,14 @@ export function NavigationLayout(props: NavigationLayoutProps): JSX.Element {
   const showLogout = useCallback(() => {
     setShowLogoutConfirmation(true)
   }, [setShowLogoutConfirmation])
+
+  const { width, previous } = useWindowDimensions()
+
+  useEffect(() => {
+    if (width < previous.width && width <= 768) {
+      props.setShowNavigationMenu(false)
+    }
+  }, [width, previous])
 
   const [showAddLinkModal, setShowAddLinkModal] = useState(false)
 
@@ -136,15 +109,15 @@ export function NavigationLayout(props: NavigationLayoutProps): JSX.Element {
     }
   }, [showLogout])
 
-  if (isLoading) {
-    return (
-      <HStack
-        css={{ width: '100vw', height: '100vh' }}
-        distribution="start"
-        alignment="start"
-      ></HStack>
-    )
-  }
+  // if (isLoading) {
+  //   return (
+  //     <HStack
+  //       css={{ width: '100vw', height: '100vh' }}
+  //       distribution="start"
+  //       alignment="start"
+  //     ></HStack>
+  //   )
+  // }
 
   return (
     <HStack
@@ -157,24 +130,46 @@ export function NavigationLayout(props: NavigationLayoutProps): JSX.Element {
       ) : null}
 
       <Header
-        menuOpen={showNavMenu}
+        menuOpen={props.showNavigationMenu}
         toggleMenu={() => {
-          setShowNavMenu(!showNavMenu)
+          props.setShowNavigationMenu(!props.showNavigationMenu)
         }}
       />
-      {!isLoading && showNavMenu && (
+      {props.showNavigationMenu && (
         <>
           <NavigationMenu
             section={props.section}
             setShowAddLinkModal={setShowAddLinkModal}
-            showMenu={showNavMenu}
+            showMenu={props.showNavigationMenu}
+            setShowMenu={props.setShowNavigationMenu}
           />
           <SpanBox
             css={{
               width: LIBRARY_LEFT_MENU_WIDTH,
+              flexShrink: '0',
               '@mdDown': {
                 display: 'none',
               },
+            }}
+          ></SpanBox>
+          <SpanBox
+            css={{
+              display: 'none',
+              position: 'fixed',
+              zIndex: '2',
+              backgroundColor: 'var(--colors-overlay)',
+              '@mdDown': {
+                display: 'flex',
+                top: '0px',
+                left: '0px',
+                width: '100vw',
+                height: '100vh',
+                pointerEvents: 'auto',
+              },
+            }}
+            onClick={(event) => {
+              props.setShowNavigationMenu(false)
+              event.stopPropagation()
             }}
           ></SpanBox>
         </>

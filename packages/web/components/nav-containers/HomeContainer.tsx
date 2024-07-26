@@ -1,11 +1,18 @@
 import * as HoverCard from '@radix-ui/react-hover-card'
 import { styled } from '@stitches/react'
 import { useRouter } from 'next/router'
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useState,
+  useContext,
+} from 'react'
 import { Button } from '../elements/Button'
 import { AddToLibraryActionIcon } from '../elements/icons/home/AddToLibraryActionIcon'
 import { ArchiveActionIcon } from '../elements/icons/home/ArchiveActionIcon'
-import { CommentActionIcon } from '../elements/icons/home/CommentActionIcon'
 import { RemoveActionIcon } from '../elements/icons/home/RemoveActionIcon'
 import { ShareActionIcon } from '../elements/icons/home/ShareActionIcon'
 import Pagination from '../elements/Pagination'
@@ -15,6 +22,7 @@ import { useApplyLocalTheme } from '../../lib/hooks/useApplyLocalTheme'
 import { useGetHiddenHomeSection } from '../../lib/networking/queries/useGetHiddenHomeSection'
 import {
   HomeItem,
+  HomeItemResponse,
   HomeItemSource,
   HomeItemSourceType,
   HomeSection,
@@ -28,11 +36,189 @@ import { Box, HStack, SpanBox, VStack } from '../elements/LayoutPrimitives'
 import { Toaster } from 'react-hot-toast'
 import { useGetViewerQuery } from '../../lib/networking/queries/useGetViewerQuery'
 import useLibraryItemActions from '../../lib/hooks/useLibraryItemActions'
+import { SyncLoader } from 'react-spinners'
+import { useGetRawSearchItemsQuery } from '../../lib/networking/queries/useGetLibraryItemsQuery'
+import { useRegisterActions } from 'kbar'
+
+type HomeState = {
+  items: HomeItem[]
+  home?: HomeSection[]
+  libraryItems?: HomeItem[]
+  selectedItem: string | undefined
+  selectedItemIdx: number | undefined
+
+  serverHome?: HomeSection[]
+  serverLibraryItems?: HomeItem[]
+}
+
+type Action =
+  | { type: 'REMOVE_ITEM'; payload: string }
+  | { type: 'SET_HOME_ITEMS'; payload: HomeSection[] }
+  | { type: 'SET_LIBRARY_ITEMS'; payload: HomeItem[] }
+  | { type: 'SET_ACTIVE_ELEMENT'; payload: string | undefined }
+  | { type: 'SET_ACTIVE_ELEMENT_IDX'; payload: number | undefined }
+
+const flattenItems = (
+  home: HomeSection[] | undefined,
+  libraryItems: HomeItem[] | undefined
+) => {
+  if (!home) {
+    return []
+  }
+  const result = [...home]
+  // If we have library items, we need to find the top_picks section
+  // and append them there.
+  if (libraryItems) {
+    const topPicks = result.find((section) => section.layout == 'top_picks')
+    if (topPicks) {
+      topPicks.title = 'From your library'
+      topPicks.items = libraryItems
+    } else {
+      console.log('could not find top picks')
+    }
+  }
+  return result
+    .filter((section) => section.layout !== 'just_added')
+    .flatMap((section) => section.items)
+}
+
+const removeItem = (
+  itemId: string,
+  home: HomeSection[] | undefined,
+  libraryItems: HomeItem[] | undefined
+) => {
+  if (home) {
+    home = home.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => item.id !== itemId),
+    }))
+  }
+  if (libraryItems) {
+    libraryItems = libraryItems.filter((item) => item.id !== itemId)
+  }
+  return { home, libraryItems }
+}
+
+const updateSelectedItem = (
+  currentSelectedItem: string | undefined,
+  previousItems: HomeItem[],
+  currentItems: HomeItem[]
+) => {
+  if (!currentSelectedItem) {
+    return undefined
+  }
+  const currentIdx = currentItems.findIndex(
+    (item) => item.id === currentSelectedItem
+  )
+  if (currentIdx !== -1) {
+    // item has not been removed
+    return currentSelectedItem
+  }
+  const previousIdx = previousItems.findIndex(
+    (item) => item.id === currentSelectedItem
+  )
+  if (previousIdx >= 0 && previousIdx < currentItems.length - 1) {
+    return currentItems[previousIdx].id
+  }
+  if (previousIdx >= 1 && previousIdx > currentItems.length - 1) {
+    return currentItems[previousIdx - 1].id
+  }
+  return undefined
+}
+
+const initialState: HomeState = {
+  items: [],
+  selectedItem: undefined,
+  selectedItemIdx: undefined,
+}
+
+const reducer = (state: HomeState, action: Action): HomeState => {
+  console.log('action: ', action)
+  switch (action.type) {
+    case 'REMOVE_ITEM':
+      const items = state.items.filter((item) => item.id !== action.payload)
+      return {
+        ...state,
+        items,
+        selectedItem: updateSelectedItem(
+          state.selectedItem,
+          state.items,
+          items
+        ),
+        ...removeItem(action.payload, state.home, state.libraryItems),
+      }
+    case 'SET_ACTIVE_ELEMENT':
+      return {
+        ...state,
+        selectedItem: action.payload,
+      }
+    case 'SET_ACTIVE_ELEMENT_IDX':
+      return {
+        ...state,
+        selectedItemIdx: action.payload,
+      }
+    case 'SET_HOME_ITEMS':
+      return {
+        ...state,
+        home: [...action.payload],
+        serverHome: [...action.payload],
+        items: flattenItems(action.payload, undefined),
+      }
+    case 'SET_LIBRARY_ITEMS':
+      return {
+        ...state,
+        libraryItems: [...action.payload],
+        serverLibraryItems: [...action.payload],
+        items: flattenItems(state.home, action.payload),
+      }
+    default:
+      console.log('hitting default return ')
+      return state
+  }
+}
+
+type NavigationContextType = {
+  state: HomeState
+  dispatch: React.Dispatch<Action>
+}
+
+const NavigationContext =
+  createContext<NavigationContextType | undefined>(undefined)
+
+export const useNavigation = (): NavigationContextType => {
+  const context = useContext(NavigationContext)
+  if (!context) {
+    throw new Error('useNavigation must be used within a NavigationProvider')
+  }
+  return context
+}
 
 export function HomeContainer(): JSX.Element {
-  const router = useRouter()
+  const [state, dispatch] = useReducer(reducer, initialState)
   const homeData = useGetHomeItems()
+
+  const router = useRouter()
   const { viewerData } = useGetViewerQuery()
+
+  const hasTopPicks = (homeData: HomeItemResponse) => {
+    const topPicks = homeData.sections?.find(
+      (section) => section.layout === 'top_picks'
+    )
+    const result = topPicks && topPicks.items.length > 0
+    return result
+  }
+
+  const shouldFallback =
+    homeData.error || (!homeData.isValidating && !hasTopPicks(homeData))
+  const searchData = useGetRawSearchItemsQuery(
+    {
+      limit: 10,
+      searchQuery: 'in:inbox',
+      includeContent: false,
+      sortDescending: true,
+    },
+    shouldFallback
+  )
 
   useApplyLocalTheme()
 
@@ -40,84 +226,266 @@ export function HomeContainer(): JSX.Element {
     return viewerData?.me?.profile.username
   }, [viewerData])
 
+  const searchItems = useMemo(() => {
+    return searchData.items.map((item) => {
+      return {
+        id: item.id,
+        date: item.savedAt,
+        title: item.title,
+        url: item.url,
+        slug: item.slug,
+        score: 1.0,
+        thumbnail: item.image,
+        previewContent: item.description,
+        source: {
+          name: item.folder == 'following' ? item.subscription : item.siteName,
+          icon: item.siteIcon,
+          type: 'LIBRARY',
+        },
+        canArchive: true,
+        canDelete: true,
+        canShare: true,
+        canMove: item.folder == 'following',
+      } as HomeItem
+    })
+  }, [searchData])
+
   useEffect(() => {
     window.localStorage.setItem('nav-return', router.asPath)
   }, [router.asPath])
 
-  return (
-    <VStack
-      distribution="start"
-      alignment="center"
-      css={{
-        width: '100%',
-        bg: '$readerBg',
-        pt: '45px',
-        minHeight: '100vh',
-        minWidth: '320px',
-        '@mdDown': {
-          pt: '0px',
-          mt: '80px',
+  useEffect(() => {
+    const newSections = homeData.sections
+    if (
+      homeData.sections &&
+      JSON.stringify(newSections) !== JSON.stringify(state.serverHome)
+    ) {
+      dispatch({
+        type: 'SET_HOME_ITEMS',
+        payload: homeData.sections,
+      })
+    }
+  }, [homeData, state.home, dispatch])
+
+  useEffect(() => {
+    if (
+      searchItems &&
+      searchItems.length > 0 &&
+      JSON.stringify(searchItems) !== JSON.stringify(state.serverLibraryItems)
+    ) {
+      dispatch({
+        type: 'SET_LIBRARY_ITEMS',
+        payload: searchItems,
+      })
+    }
+  }, [searchItems, state.libraryItems, dispatch])
+
+  const moveSelectedItem = useCallback(
+    (direction: 'next' | 'previous') => {
+      const elements = document.querySelectorAll('[data-navigable]')
+      // this is the old index, if its less than
+      // the current length then its good because
+      // the removed item will give
+      let index = Array.from(elements).findIndex(
+        (element) =>
+          element.getAttribute('data-navigable') == state.selectedItem
+      )
+
+      if (direction == 'next') {
+        index = index === -1 ? 0 : Math.min(index + 1, state.items.length - 1)
+      } else if (direction == 'previous') {
+        index = index === -1 ? 0 : Math.max(index - 1, 0)
+      }
+
+      const selected = state.items[index]
+      if (state.selectedItem !== selected.id) {
+        dispatch({
+          type: 'SET_ACTIVE_ELEMENT',
+          payload: selected.id,
+        })
+      }
+    },
+    [state, dispatch]
+  )
+
+  useEffect(() => {
+    if (state.selectedItem) {
+      const element = document.querySelector<HTMLElement>(
+        `[data-navigable="${state.selectedItem}"]`
+      )
+      element?.focus()
+      localStorage.setItem('activeElementId', state.selectedItem)
+    }
+  }, [state.selectedItem])
+
+  useEffect(() => {
+    const selectedItem = localStorage.getItem('activeElementId')
+    console.log('loaded selected item: ', selectedItem)
+    if (selectedItem) {
+      dispatch({
+        type: 'SET_ACTIVE_ELEMENT',
+        payload: selectedItem,
+      })
+    }
+  }, [])
+
+  useRegisterActions(
+    [
+      {
+        id: 'move_next',
+        section: 'Items',
+        name: 'Focus next item',
+        shortcut: ['arrowdown'],
+        keywords: 'move next',
+        perform: () => {
+          moveSelectedItem('next')
         },
-      }}
-    >
-      <Toaster />
+      },
+      {
+        id: 'move_previous',
+        section: 'Items',
+        name: 'Focus previous item',
+        shortcut: ['arrowup'],
+        keywords: 'move previous',
+        perform: () => {
+          moveSelectedItem('previous')
+        },
+      },
+      {
+        id: 'move_next_vim',
+        section: 'Items',
+        name: 'Focus next item',
+        shortcut: ['j'],
+        keywords: 'move next',
+        perform: () => {
+          moveSelectedItem('next')
+        },
+      },
+      {
+        id: 'move_previous_vim',
+        section: 'Items',
+        name: 'Focus previous item',
+        shortcut: ['k'],
+        keywords: 'move previous',
+        perform: () => {
+          moveSelectedItem('previous')
+        },
+      },
+
+      // {
+      //   shortcutKeys: ['a'],
+      //   actionDescription: 'Open Add Link dialog',
+      //   shortcutKeyDescription: 'a',
+      //   callback: () => actionHandler('showAddLinkModal'),
+      // },
+    ],
+    [state.selectedItem, moveSelectedItem]
+  )
+
+  const dataReady =
+    !homeData.isValidating && (!shouldFallback || !searchData.isValidating)
+  if (!dataReady || (homeData.error && homeData.errorMessage == 'PENDING')) {
+    console.log('showing pending')
+    return (
+      <VStack
+        distribution="center"
+        alignment="center"
+        css={{
+          width: '100%',
+          bg: '$readerBg',
+          minHeight: '100vh',
+          minWidth: '320px',
+        }}
+      >
+        <SyncLoader color={theme.colors.omnivoreGray.toString()} size={8} />
+      </VStack>
+    )
+  }
+
+  return (
+    <NavigationContext.Provider value={{ state, dispatch }}>
       <VStack
         distribution="start"
+        alignment="center"
         css={{
-          width: '680px',
-          gap: '50px',
+          width: '100%',
+          bg: '$readerBg',
+          pt: '45px',
           minHeight: '100vh',
+          minWidth: '320px',
           '@mdDown': {
-            gap: '40px',
-            width: '100%',
+            pt: '0px',
+            mt: '80px',
           },
         }}
       >
-        {homeData.sections?.map((homeSection, idx) => {
-          if (homeSection.items.length < 1) {
-            console.log('empty home section: ', homeSection)
-            return <SpanBox key={`section-${idx}`}></SpanBox>
-          }
-          switch (homeSection.layout) {
-            case 'just_added':
-              return (
-                <JustAddedHomeSection
-                  key={`section-${idx}`}
-                  homeSection={homeSection}
-                  viewerUsername={viewerUsername}
-                />
-              )
-            case 'top_picks':
-              return (
-                <TopPicksHomeSection
-                  key={`section-${idx}`}
-                  homeSection={homeSection}
-                  viewerUsername={viewerUsername}
-                />
-              )
-            case 'quick_links':
-              return (
-                <QuickLinksHomeSection
-                  key={`section-${idx}`}
-                  homeSection={homeSection}
-                  viewerUsername={viewerUsername}
-                />
-              )
-            case 'hidden':
-              return (
-                <HiddenHomeSection
-                  key={`section-${idx}`}
-                  homeSection={homeSection}
-                  viewerUsername={viewerUsername}
-                />
-              )
-            default:
-              console.log('unknown home section: ', homeSection)
-              return <SpanBox key={`section-${idx}`}></SpanBox>
-          }
-        })}
+        <Toaster />
+        <VStack
+          distribution="start"
+          css={{
+            width: '680px',
+            gap: '50px',
+            minHeight: '100vh',
+            '@lgDown': {
+              gap: '40px',
+              width: '80%',
+            },
+            '@mdDown': {
+              width: '100%',
+            },
+          }}
+        >
+          {state.home?.map((homeSection, idx) => {
+            switch (homeSection.layout) {
+              case 'just_added':
+                if (homeSection.items.length < 1) {
+                  return <SpanBox key={`section-${idx}`}></SpanBox>
+                }
+                return (
+                  <JustAddedHomeSection
+                    key={`section-${idx}`}
+                    homeSection={homeSection}
+                    viewerUsername={viewerUsername}
+                  />
+                )
+              case 'top_picks':
+                return (
+                  <TopPicksHomeSection
+                    key={`section-${idx}`}
+                    homeSection={homeSection}
+                    viewerUsername={viewerUsername}
+                  />
+                )
+              case 'quick_links':
+                if (homeSection.items.length < 1) {
+                  return <SpanBox key={`section-${idx}`}></SpanBox>
+                }
+                return (
+                  <QuickLinksHomeSection
+                    key={`section-${idx}`}
+                    homeSection={homeSection}
+                    viewerUsername={viewerUsername}
+                  />
+                )
+              case 'hidden':
+                if (homeSection.items.length < 1) {
+                  return <SpanBox key={`section-${idx}`}></SpanBox>
+                }
+                return (
+                  <HiddenHomeSection
+                    key={`section-${idx}`}
+                    homeSection={homeSection}
+                    viewerUsername={viewerUsername}
+                  />
+                )
+              default:
+                console.log('unknown home section: ', homeSection)
+                return <SpanBox key={`section-${idx}`}></SpanBox>
+            }
+          })}
+        </VStack>
       </VStack>
-    </VStack>
+    </NavigationContext.Provider>
   )
 }
 
@@ -216,40 +584,32 @@ const JustAddedHomeSection = (props: HomeSectionProps): JSX.Element => {
 }
 
 const TopPicksHomeSection = (props: HomeSectionProps): JSX.Element => {
-  const listReducer = (
-    state: HomeItem[],
-    action: {
-      type: string
-      itemId?: string
-      items?: HomeItem[]
-    }
-  ) => {
-    console.log('handling action: ', action)
-    switch (action.type) {
-      case 'RESET':
-        return action.items ?? []
-      case 'REMOVE_ITEM':
-        return state.filter((item) => item.id !== action.itemId)
-      default:
-        throw new Error()
-    }
+  const { state, dispatch } = useNavigation()
+
+  const items = useMemo(() => {
+    return (
+      state.home?.find((section) => section.layout == 'top_picks')?.items ?? []
+    )
+  }, [props, state.home])
+
+  if (items.length < 1) {
+    return (
+      <VStack
+        distribution="start"
+        css={{
+          height: '540px',
+          width: '100%',
+          gap: '20px',
+          '@mdDown': {
+            gap: '10px',
+          },
+          bg: '$homeCardHover',
+        }}
+      >
+        Your top picks are empty.
+      </VStack>
+    )
   }
-
-  const [items, dispatchList] = useReducer(listReducer, [])
-
-  function handleDelete(item: HomeItem) {
-    dispatchList({
-      type: 'REMOVE_ITEM',
-      itemId: item.id,
-    })
-  }
-
-  useEffect(() => {
-    dispatchList({
-      type: 'RESET',
-      items: props.homeSection.items,
-    })
-  }, [props])
 
   return (
     <VStack
@@ -283,11 +643,7 @@ const TopPicksHomeSection = (props: HomeSectionProps): JSX.Element => {
         itemsPerPage={10}
         loadMoreButtonText="Load more Top Picks"
         render={(homeItem) => (
-          <TopPicksItemView
-            key={homeItem.id}
-            homeItem={homeItem}
-            dispatchList={dispatchList}
-          />
+          <TopPicksItemView key={homeItem.id} homeItem={homeItem} />
         )}
       />
     </VStack>
@@ -295,6 +651,13 @@ const TopPicksHomeSection = (props: HomeSectionProps): JSX.Element => {
 }
 
 const QuickLinksHomeSection = (props: HomeSectionProps): JSX.Element => {
+  const { state } = useNavigation()
+  const items = useMemo(() => {
+    return (
+      state.home?.find((section) => section.layout == 'quick_links')?.items ??
+      []
+    )
+  }, [props, state.home])
   return (
     <VStack
       distribution="start"
@@ -324,7 +687,7 @@ const QuickLinksHomeSection = (props: HomeSectionProps): JSX.Element => {
       </SpanBox>
 
       <Pagination
-        items={props.homeSection.items}
+        items={items}
         itemsPerPage={8}
         render={(homeItem) => (
           <QuickLinkHomeItemView key={homeItem.id} homeItem={homeItem} />
@@ -576,19 +939,70 @@ const JustAddedItemView = (props: HomeItemViewProps): JSX.Element => {
   )
 }
 
-type TopPicksItemViewProps = {
-  dispatchList: (args: { type: string; itemId?: string }) => void
-}
-
-const TopPicksItemView = (
-  props: HomeItemViewProps & TopPicksItemViewProps
-): JSX.Element => {
+const TopPicksItemView = (props: HomeItemViewProps): JSX.Element => {
   const router = useRouter()
+  const { dispatch } = useNavigation()
   const { archiveItem, deleteItem, moveItem, shareItem } =
     useLibraryItemActions()
 
+  const doArchiveItem = useCallback(
+    async (libraryItemId: string) => {
+      dispatch({
+        type: 'REMOVE_ITEM',
+        payload: libraryItemId,
+      })
+      if (!(await archiveItem(libraryItemId))) {
+        // dispatch({
+        //   type: 'REPLACE_ITEM',
+        //   itemId: libraryItemId,
+        // })
+      }
+    },
+    [archiveItem]
+  )
+
+  const doDeleteItem = useCallback(
+    async (libraryItemId: string) => {
+      dispatch({
+        type: 'REMOVE_ITEM',
+        payload: libraryItemId,
+      })
+      const undo = () => {
+        // props.dispatch({
+        //   type: 'REPLACE_ITEM',
+        //   : libraryItemId,
+        // })
+      }
+      if (!(await deleteItem(libraryItemId, undo))) {
+        // dispatch({
+        //   type: 'REPLACE_ITEM',
+        //   payload: libraryItemId,
+        // })
+      }
+    },
+    [deleteItem]
+  )
+
+  const doMoveItem = useCallback(
+    async (libraryItemId: string) => {
+      dispatch({
+        type: 'REMOVE_ITEM',
+        payload: libraryItemId,
+      })
+      if (!(await moveItem(libraryItemId))) {
+        // dispatch({
+        //   type: 'REPLACE_ITEM',
+        //   payload: libraryItemId,
+        // })
+      }
+    },
+    [moveItem]
+  )
+
   return (
     <VStack
+      tabIndex={0}
+      data-navigable={props.homeItem.id}
       css={{
         width: '100%',
         pt: '15px',
@@ -596,6 +1010,13 @@ const TopPicksItemView = (
         borderRadius: '5px',
         '@mdDown': {
           borderRadius: '0px',
+        },
+        '&:focus-visible': {
+          outline: 'none',
+          bg: '$homeCardHover',
+        },
+        '&:focus-visible .title-text': {
+          textDecoration: 'underline',
         },
         '&:hover': {
           bg: '$homeCardHover',
@@ -610,6 +1031,25 @@ const TopPicksItemView = (
           window.open(path, '_blank')
         } else {
           router.push(path)
+        }
+      }}
+      onKeyDown={(event) => {
+        switch (event.key.toLowerCase()) {
+          case 'enter':
+            ;(event.target as HTMLElement).click()
+            break
+          case 'e':
+            doArchiveItem(props.homeItem.id)
+            break
+          case '#':
+            doDeleteItem(props.homeItem.id)
+            break
+          case 'm':
+            doMoveItem(props.homeItem.id)
+            break
+          case 'o':
+            window.open(props.homeItem.url, '_blank')
+            break
         }
       }}
       alignment="start"
@@ -646,93 +1086,59 @@ const TopPicksItemView = (
       </Box>
       <SpanBox css={{ px: '20px' }}></SpanBox>
       <HStack css={{ gap: '10px', my: '15px', px: '20px' }}>
-        {props.homeItem.canSave && (
+        {props.homeItem.canMove && (
           <Button
+            title="Add to library"
             style="homeAction"
             onClick={async (event) => {
               event.preventDefault()
               event.stopPropagation()
 
-              props.dispatchList({
-                type: 'REMOVE_ITEM',
-                itemId: props.homeItem.id,
-              })
-              if (!(await moveItem(props.homeItem.id))) {
-                props.dispatchList({
-                  type: 'REPLACE_ITEM',
-                  itemId: props.homeItem.id,
-                })
-              }
+              await doMoveItem(props.homeItem.id)
             }}
           >
-            <AddToLibraryActionIcon
-              color={theme.colors.homeActionIcons.toString()}
-            />
+            <AddToLibraryActionIcon />
           </Button>
         )}
         {props.homeItem.canArchive && (
           <Button
+            title="Archive"
             style="homeAction"
             onClick={async (event) => {
               event.preventDefault()
               event.stopPropagation()
 
-              props.dispatchList({
-                type: 'REMOVE_ITEM',
-                itemId: props.homeItem.id,
-              })
-              if (!(await archiveItem(props.homeItem.id))) {
-                props.dispatchList({
-                  type: 'REPLACE_ITEM',
-                  itemId: props.homeItem.id,
-                })
-              }
+              await doArchiveItem(props.homeItem.id)
             }}
           >
-            <ArchiveActionIcon
-              color={theme.colors.homeActionIcons.toString()}
-            />
+            <ArchiveActionIcon />
           </Button>
         )}
         {props.homeItem.canDelete && (
           <Button
+            title="Delete"
             style="homeAction"
             onClick={async (event) => {
               event.preventDefault()
               event.stopPropagation()
 
-              props.dispatchList({
-                type: 'REMOVE_ITEM',
-                itemId: props.homeItem.id,
-              })
-              const undo = () => {
-                props.dispatchList({
-                  type: 'REPLACE_ITEM',
-                  itemId: props.homeItem.id,
-                })
-              }
-              if (!(await deleteItem(props.homeItem.id, undo))) {
-                props.dispatchList({
-                  type: 'REPLACE_ITEM',
-                  itemId: props.homeItem.id,
-                })
-              }
+              await doDeleteItem(props.homeItem.id)
             }}
           >
-            <RemoveActionIcon color={theme.colors.homeActionIcons.toString()} />
+            <RemoveActionIcon />
           </Button>
         )}
         {props.homeItem.canShare && (
           <Button
+            title="Share original"
             style="homeAction"
             onClick={async (event) => {
               event.preventDefault()
               event.stopPropagation()
-
               await shareItem(props.homeItem.title, props.homeItem.url)
             }}
           >
-            <ShareActionIcon color={theme.colors.homeActionIcons.toString()} />
+            <ShareActionIcon />
           </Button>
         )}
       </HStack>
@@ -748,6 +1154,7 @@ const QuickLinkHomeItemView = (props: HomeItemViewProps): JSX.Element => {
 
   return (
     <VStack
+      data-navigable={props.homeItem.id}
       css={{
         mt: '10px',
         width: '100%',
@@ -808,47 +1215,55 @@ type SourceInfoProps = {
   subtle?: boolean
 }
 
-const SourceInfo = (props: HomeItemViewProps & SourceInfoProps) => (
-  <HoverCard.Root>
-    <HoverCard.Trigger asChild>
-      <HStack
-        distribution="start"
-        alignment="center"
-        css={{
-          gap: '8px',
-          height: '16px',
-          cursor: 'pointer',
-          flex: '1',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {props.homeItem.source.icon && (
-          <SiteIconSmall src={props.homeItem.source.icon} />
-        )}
+const SourceInfo = (props: HomeItemViewProps & SourceInfoProps) => {
+  const hasHover = useMemo(() => {
+    const type = props.homeItem.source.type
+    return type == 'RSS' || type == 'NEWSLETTER'
+  }, [props])
+  return (
+    <HoverCard.Root>
+      <HoverCard.Trigger asChild>
         <HStack
+          distribution="start"
+          alignment="center"
           css={{
-            lineHeight: '1',
-            fontFamily: '$inter',
-            fontWeight: '500',
-            fontSize: props.subtle ? '12px' : '13px',
-            color: props.subtle ? '$homeTextSubtle' : '$homeTextSource',
-            textDecoration: 'underline',
+            gap: '8px',
+            height: '16px',
+            cursor: 'pointer',
+            flex: '1',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
           }}
         >
-          {props.homeItem.source.name}
+          {props.homeItem.source.icon && (
+            <SiteIconSmall src={props.homeItem.source.icon} />
+          )}
+          <HStack
+            css={{
+              lineHeight: '1',
+              fontFamily: '$inter',
+              fontWeight: '500',
+              fontSize: props.subtle ? '12px' : '13px',
+              color: props.subtle ? '$homeTextSubtle' : '$homeTextSource',
+              textDecoration: hasHover ? 'underline' : 'unset',
+            }}
+          >
+            {props.homeItem.source.name}
+          </HStack>
         </HStack>
-      </HStack>
-    </HoverCard.Trigger>
-    <HoverCard.Portal>
-      <HoverCard.Content sideOffset={5} style={{ zIndex: 5 }}>
-        <SubscriptionSourceHoverContent source={props.homeItem.source} />
-        <HoverCard.Arrow fill={theme.colors.thBackground2.toString()} />
-      </HoverCard.Content>
-    </HoverCard.Portal>
-  </HoverCard.Root>
-)
+      </HoverCard.Trigger>
+      {hasHover && (
+        <HoverCard.Portal>
+          <HoverCard.Content sideOffset={5} style={{ zIndex: 5 }}>
+            <SubscriptionSourceHoverContent source={props.homeItem.source} />
+            <HoverCard.Arrow fill={theme.colors.thBackground2.toString()} />
+          </HoverCard.Content>
+        </HoverCard.Portal>
+      )}
+    </HoverCard.Root>
+  )
+}
 
 type SourceHoverContentProps = {
   source: HomeItemSource

@@ -24,6 +24,7 @@ import { ThemeId } from '../components/tokens/stitches.config'
 import { posthog } from 'posthog-js'
 import { GoogleReCaptchaProvider } from '@google-recaptcha/react'
 import { SWRConfig } from 'swr'
+import { DEFAULT_HOME_PATH } from '../lib/navigations'
 
 TopBarProgress.config({
   barColors: {
@@ -35,22 +36,7 @@ TopBarProgress.config({
 })
 
 const generateActions = (router: NextRouter) => {
-  const defaultActions = [
-    {
-      id: 'home',
-      section: 'Navigation',
-      name: 'Go to Home (Library) ',
-      shortcut: ['g', 'h'],
-      keywords: 'go home',
-      perform: () => {
-        const navReturn = window.localStorage.getItem('nav-return')
-        if (navReturn) {
-          router.push(navReturn)
-          return
-        }
-        router?.push('/l/home')
-      },
-    },
+  return [
     {
       id: 'lightTheme',
       section: 'Preferences',
@@ -70,8 +56,6 @@ const generateActions = (router: NextRouter) => {
       perform: () => updateTheme(ThemeId.Dark),
     },
   ]
-
-  return defaultActions
 }
 
 const ConditionalCaptchaProvider = (props: {

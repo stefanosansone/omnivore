@@ -20,7 +20,7 @@ export interface BackendEnv {
       max: number
     }
     replication: boolean
-    slave: {
+    replica: {
       host: string
       port: number
       userName: string
@@ -54,6 +54,9 @@ export interface BackendEnv {
   intercom: {
     token: string
     secretKey: string
+    webSecret: string
+    iosSecret: string
+    androidSecret: string
   }
   sentry: {
     dsn: string
@@ -188,11 +191,14 @@ const nullableEnvVars = [
   'NOTION_AUTH_URL',
   'SCORE_API_URL',
   'PG_REPLICATION',
-  'PG_SLAVE_HOST',
-  'PG_SLAVE_PORT',
-  'PG_SLAVE_USER',
-  'PG_SLAVE_PASSWORD',
-  'PG_SLAVE_DB',
+  'PG_REPLICA_HOST',
+  'PG_REPLICA_PORT',
+  'PG_REPLICA_USER',
+  'PG_REPLICA_PASSWORD',
+  'PG_REPLICA_DB',
+  'INTERCOM_WEB_SECRET',
+  'INTERCOM_IOS_SECRET',
+  'INTERCOM_ANDROID_SECRET',
 ] // Allow some vars to be null/empty
 
 const envParser =
@@ -233,12 +239,12 @@ export function getEnv(): BackendEnv {
       max: parseInt(parse('PG_POOL_MAX'), 10),
     },
     replication: parse('PG_REPLICATION') === 'true',
-    slave: {
-      host: parse('PG_SLAVE_HOST'),
-      port: parseInt(parse('PG_SLAVE_PORT'), 10),
-      userName: parse('PG_SLAVE_USER'),
-      password: parse('PG_SLAVE_PASSWORD'),
-      dbName: parse('PG_SLAVE_DB'),
+    replica: {
+      host: parse('PG_REPLICA_HOST'),
+      port: parseInt(parse('PG_REPLICA_PORT'), 10),
+      userName: parse('PG_REPLICA_USER'),
+      password: parse('PG_REPLICA_PASSWORD'),
+      dbName: parse('PG_REPLICA_DB'),
     },
   }
   const server = {
@@ -268,6 +274,9 @@ export function getEnv(): BackendEnv {
   const intercom = {
     token: parse('INTERCOM_TOKEN'),
     secretKey: parse('INTERCOM_SECRET_KEY'),
+    webSecret: parse('INTERCOM_WEB_SECRET'),
+    iosSecret: parse('INTERCOM_IOS_SECRET'),
+    androidSecret: parse('INTERCOM_ANDROID_SECRET'),
   }
   const sentry = {
     dsn: parse('SENTRY_DSN'),
