@@ -21,6 +21,7 @@ interface DatastoreRepository {
 
     suspend fun updateUseUltraRealisticVoices(useUrv: Boolean)
     suspend fun updateEnglishVoice(voice: String)
+    suspend fun setDefaultTtsLanguage(language: String)
     suspend fun clear()
     suspend fun putBoolean(key: String, value: Boolean)
     suspend fun getBoolean(key: String): Boolean
@@ -42,7 +43,8 @@ class OmnivoreDatastore @Inject constructor(
         .map { preferences ->
             val ttsUrv = preferences[PreferencesKeys.TTS_URV]?: false
             val ttsEnglishVoice = preferences[PreferencesKeys.TTS_ENGLISH_VOICE]?: "en"
-            UserPreferences(ttsUrv, ttsEnglishVoice)
+            val ttsLanguage = preferences[PreferencesKeys.TTS_LANGUAGE]?: "English"
+            UserPreferences(ttsUrv, ttsEnglishVoice, ttsLanguage)
         }
 
     override suspend fun updateUseUltraRealisticVoices(useUrv: Boolean) {
@@ -54,6 +56,12 @@ class OmnivoreDatastore @Inject constructor(
     override suspend fun updateEnglishVoice(voice: String) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.TTS_ENGLISH_VOICE] = voice
+        }
+    }
+
+    override suspend fun setDefaultTtsLanguage(language: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.TTS_LANGUAGE] = language
         }
     }
 

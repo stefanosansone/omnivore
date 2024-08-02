@@ -26,4 +26,5 @@ const val rtlText = "rtlText"
 object PreferencesKeys {
     val TTS_URV = booleanPreferencesKey("tts_urv")
     val TTS_ENGLISH_VOICE = stringPreferencesKey("tts_english_voice")
+    val TTS_LANGUAGE = stringPreferencesKey("tts_language")
 }
