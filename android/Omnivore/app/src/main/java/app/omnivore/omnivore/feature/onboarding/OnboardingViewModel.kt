@@ -14,7 +14,7 @@ import app.omnivore.omnivore.core.common.result.Result
 import app.omnivore.omnivore.core.data.DataService
 import app.omnivore.omnivore.core.data.repository.AccountRepository
 import app.omnivore.omnivore.core.datastore.DatastoreRepository
-import app.omnivore.omnivore.core.datastore.followingTabActive
+import app.omnivore.omnivore.core.datastore.UserPreferences
 import app.omnivore.omnivore.core.datastore.omnivoreAuthCookieString
 import app.omnivore.omnivore.core.datastore.omnivoreAuthToken
 import app.omnivore.omnivore.core.datastore.omnivorePendingUserToken
@@ -40,7 +40,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -86,12 +85,10 @@ class OnboardingViewModel @Inject constructor(
             scope = viewModelScope, started = SharingStarted.Lazily, initialValue = true
         )
 
-    val followingTabActiveState: StateFlow<Boolean> = flow {
-        emit(datastoreRepository.getBoolean(followingTabActive))
-    }.stateIn(
+    val userPreferencesState: StateFlow<UserPreferences> = datastoreRepository.userPreferencesFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Lazily,
-        initialValue = true
+        initialValue = UserPreferences()
     )
 
     fun setSelfHostingDetails(context: Context, apiServer: String, webServer: String) {

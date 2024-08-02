@@ -3,11 +3,10 @@ package app.omnivore.omnivore.feature.profile.filters
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.omnivore.omnivore.core.datastore.DatastoreRepository
-import app.omnivore.omnivore.core.datastore.followingTabActive
+import app.omnivore.omnivore.core.datastore.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -17,17 +16,16 @@ class FiltersViewModel @Inject constructor(
     private val datastoreRepository: DatastoreRepository
 ) : ViewModel() {
 
-    val followingTabActiveState: StateFlow<Boolean> = flow {
-        emit(datastoreRepository.getBoolean(followingTabActive))
-    }.stateIn(
+    val userPreferencesState: StateFlow<UserPreferences> = datastoreRepository.userPreferencesFlow.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(),
-        initialValue = false
+        started = SharingStarted.Lazily,
+        initialValue = UserPreferences()
     )
 
-    fun setFollowingTabActiveState(value: Boolean) {
+
+    fun setFollowingTabActiveState(isFollowingTabActive: Boolean) {
         viewModelScope.launch {
-            datastoreRepository.putBoolean(followingTabActive, value)
+            datastoreRepository.setFollowingTabActive(isFollowingTabActive)
         }
     }
 }

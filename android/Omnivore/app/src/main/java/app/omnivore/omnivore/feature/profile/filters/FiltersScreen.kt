@@ -49,11 +49,11 @@ internal fun FiltersScreen(
             contentPadding = contentPadding,
         ) {
             item {
-                val followingTabActive by filtersViewModel.followingTabActiveState.collectAsStateWithLifecycle()
+                val userPreferencesState by filtersViewModel.userPreferencesState.collectAsStateWithLifecycle()
 
                 SwitchPreferenceWidget(
                     title = stringResource(R.string.hide_following_tab),
-                    checked = !followingTabActive,
+                    checked = !userPreferencesState.followingTabActive,
                     onCheckedChanged = { filtersViewModel.setFollowingTabActiveState(!it) },
                 )
             }

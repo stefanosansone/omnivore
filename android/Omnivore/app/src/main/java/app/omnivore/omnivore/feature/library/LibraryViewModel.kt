@@ -13,7 +13,7 @@ import app.omnivore.omnivore.core.data.repository.LibraryRepository
 import app.omnivore.omnivore.core.database.entities.SavedItemLabel
 import app.omnivore.omnivore.core.database.entities.SavedItemWithLabelsAndHighlights
 import app.omnivore.omnivore.core.datastore.DatastoreRepository
-import app.omnivore.omnivore.core.datastore.followingTabActive
+import app.omnivore.omnivore.core.datastore.UserPreferences
 import app.omnivore.omnivore.core.datastore.lastUsedSavedItemFilter
 import app.omnivore.omnivore.core.datastore.lastUsedSavedItemSortFilter
 import app.omnivore.omnivore.core.datastore.libraryLastSyncTimestamp
@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -63,12 +62,10 @@ class LibraryViewModel @Inject constructor(
         )
     )
 
-    private val followingTabActiveState: StateFlow<Boolean> = flow {
-        emit(datastoreRepository.getBoolean(followingTabActive))
-    }.stateIn(
+    val userPreferencesState: StateFlow<UserPreferences> = datastoreRepository.userPreferencesFlow.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(),
-        initialValue = false
+        started = SharingStarted.Lazily,
+        initialValue = UserPreferences()
     )
 
     private fun updateLibraryQuery() {
@@ -77,8 +74,8 @@ class LibraryViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            followingTabActiveState.collect { tabActive ->
-                if (tabActive) {
+            userPreferencesState.collect { preferences ->
+                if (preferences.followingTabActive) {
                     folders.value = listOf("inbox")
                 } else {
                     folders.value = listOf("inbox","following")

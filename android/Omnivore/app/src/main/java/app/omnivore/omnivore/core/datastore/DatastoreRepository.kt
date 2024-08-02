@@ -24,10 +24,10 @@ interface DatastoreRepository {
     suspend fun setDefaultTtsLanguage(language: String)
     suspend fun setHighContrastText(isHighContrastTextActive: Boolean)
     suspend fun setRtlText(isRtlTextActive: Boolean)
+    suspend fun setFollowingTabActive(isFollowingTabActive: Boolean)
     suspend fun setVolumeRockerForScroll(isVolumeRockerForScrollActive: Boolean)
     suspend fun clear()
     suspend fun putBoolean(key: String, value: Boolean)
-    suspend fun getBoolean(key: String): Boolean
     suspend fun putString(key: String, value: String)
     suspend fun putInt(key: String, value: Int)
     suspend fun getString(key: String): String?
@@ -44,13 +44,14 @@ class OmnivoreDatastore @Inject constructor(
 
     override val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
         .map { preferences ->
+            val followingTabActive = preferences[PreferencesKeys.FOLLOWING_TAB_ACTIVE] ?: false
             val ttsUrv = preferences[PreferencesKeys.TTS_URV] ?: false
             val ttsEnglishVoice = preferences[PreferencesKeys.TTS_ENGLISH_VOICE] ?: "en"
             val ttsLanguage = preferences[PreferencesKeys.TTS_LANGUAGE] ?: "English"
             val rtlText = preferences[PreferencesKeys.RTL_TEXT] ?: false
             val volumeForScroll = preferences[PreferencesKeys.VOLUME_ROCKER_FOR_SCROLL] ?: false
             val highContrastText = preferences[PreferencesKeys.HIGH_CONTRAST_TEXT] ?: false
-            UserPreferences(ttsUrv, ttsEnglishVoice, ttsLanguage, rtlText, volumeForScroll, highContrastText)
+            UserPreferences(followingTabActive, ttsUrv, ttsEnglishVoice, ttsLanguage, rtlText, volumeForScroll, highContrastText)
         }
 
     override suspend fun updateUseUltraRealisticVoices(useUrv: Boolean) {
@@ -68,6 +69,12 @@ class OmnivoreDatastore @Inject constructor(
     override suspend fun setRtlText(isRtlTextActive: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.RTL_TEXT] = isRtlTextActive
+        }
+    }
+
+    override suspend fun setFollowingTabActive(isFollowingTabActive: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.FOLLOWING_TAB_ACTIVE] = isFollowingTabActive
         }
     }
 
@@ -94,12 +101,6 @@ class OmnivoreDatastore @Inject constructor(
         context.dataStore.edit { preferences ->
             preferences[preferencesKey] = value
         }
-    }
-
-    override suspend fun getBoolean(key: String): Boolean {
-        val preferencesKey = booleanPreferencesKey(key)
-        val preferences = context.dataStore.data.first()
-        return preferences[preferencesKey] ?: false
     }
 
     override suspend fun putString(key: String, value: String) {

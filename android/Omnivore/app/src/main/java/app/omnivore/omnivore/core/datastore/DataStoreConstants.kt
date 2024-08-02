@@ -19,9 +19,9 @@ const val prefersJustifyText = "prefersJustifyText"
 const val lastUsedSavedItemFilter = "lastUsedSavedItemFilter"
 const val lastUsedSavedItemSortFilter = "lastUsedSavedItemSortFilter"
 const val preferredTheme = "preferredTheme"
-const val followingTabActive = "followingTabActive"
 
 object PreferencesKeys {
+    val FOLLOWING_TAB_ACTIVE = booleanPreferencesKey("following_tab_active")
     val TTS_URV = booleanPreferencesKey("tts_urv")
     val TTS_ENGLISH_VOICE = stringPreferencesKey("tts_english_voice")
     val TTS_LANGUAGE = stringPreferencesKey("tts_language")

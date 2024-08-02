@@ -38,11 +38,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import app.omnivore.omnivore.core.designsystem.theme.OmnivoreBrand
-import app.omnivore.omnivore.feature.onboarding.OnboardingViewModel
-import app.omnivore.omnivore.feature.onboarding.OnboardingScreen
 import app.omnivore.omnivore.feature.following.FollowingScreen
 import app.omnivore.omnivore.feature.library.LibraryView
 import app.omnivore.omnivore.feature.library.SearchView
+import app.omnivore.omnivore.feature.onboarding.OnboardingScreen
+import app.omnivore.omnivore.feature.onboarding.OnboardingViewModel
 import app.omnivore.omnivore.feature.profile.SettingsScreen
 import app.omnivore.omnivore.feature.profile.about.AboutScreen
 import app.omnivore.omnivore.feature.profile.account.AccountScreen
@@ -63,10 +63,10 @@ fun RootView(
     val snackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
 
-    val followingTabActive by onboardingViewModel.followingTabActiveState.collectAsStateWithLifecycle()
+    val userPreferencesState by onboardingViewModel.userPreferencesState.collectAsStateWithLifecycle()
     val hasAuthToken by onboardingViewModel.hasAuthTokenState.collectAsStateWithLifecycle()
 
-    val destinations = if (followingTabActive) {
+    val destinations = if (userPreferencesState.followingTabActive) {
         TopLevelDestination.entries
     } else {
         TopLevelDestination.entries.filter { it.route != Routes.Following.route }
