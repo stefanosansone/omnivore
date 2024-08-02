@@ -26,6 +26,7 @@ interface SavedItemDao {
     @Query("SELECT * FROM savedItem WHERE serverSyncStatus != 0")
     fun getUnSynced(): List<SavedItem>
 
+    @Transaction
     @Query("SELECT * FROM savedItem WHERE slug = :slug")
     suspend fun getSavedItemWithLabelsAndHighlights(slug: String): SavedItemWithLabelsAndHighlights?
 
