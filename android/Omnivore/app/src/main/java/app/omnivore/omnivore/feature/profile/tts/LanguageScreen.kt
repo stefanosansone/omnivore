@@ -35,8 +35,8 @@ internal fun LanguageScreen(
     viewModel: TextToSpeechViewModel = hiltViewModel()
 ) {
 
-    val langs = remember { Voices.Languages }
-    val uiState by viewModel.userPreferencesState.collectAsStateWithLifecycle()
+    val languages = remember { Voices.Languages }
+    val userPreferencesState by viewModel.userPreferencesState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -59,17 +59,17 @@ internal fun LanguageScreen(
         LazyColumn(
             modifier = Modifier.padding(contentPadding),
         ) {
-            items(langs) {
+            items(languages) {
                 ListItem(
                     modifier = Modifier.clickable {
-                        viewModel.setTtsLanguage(it.key)
+                        viewModel.setTtsLanguage(it.name)
                     },
                     colors = ListItemDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.background
                     ),
                     headlineContent = { Text(it.name) },
                     trailingContent = {
-                        if (uiState.ttsLanguage == it.key) {
+                        if (userPreferencesState.ttsLanguage == it.name) {
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = null,

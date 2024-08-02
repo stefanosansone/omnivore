@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AssistChip
@@ -23,6 +22,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -71,10 +71,7 @@ fun ReaderPreferencesSheet(
 
     var themeState by remember { mutableStateOf(currentWebPreferences.storedThemePreference) }
 
-
-    val volumeForScrollState by webReaderViewModel.volumeRockerForScrollState.collectAsStateWithLifecycle()
-
-    val rtlTextState by webReaderViewModel.rtlTextState.collectAsStateWithLifecycle()
+    val userPreferencesState by webReaderViewModel.userPreferencesState.collectAsStateWithLifecycle()
 
     OmnivoreTheme {
         // Temporary wrapping for margin while migrating components to design system
@@ -261,14 +258,10 @@ fun ReaderPreferencesSheet(
                     Spacer(modifier = Modifier.weight(2.0F))
                 }
             }
-            // TODO : Use state flow
             SwitchPreferenceWidget(
                 title = stringResource(R.string.reader_preferences_view_high_constrast_text),
-                checked = highContrastTextSwitchState,
-                onCheckedChanged = {
-                    highContrastTextSwitchState = it
-                    webReaderViewModel.updateHighContrastTextPreference(it)
-                },
+                checked = userPreferencesState.highContrastText,
+                onCheckedChanged = { webReaderViewModel.setHighContrastTextState(it) },
             )
             // TODO : Use state flow
             SwitchPreferenceWidget(
@@ -281,12 +274,12 @@ fun ReaderPreferencesSheet(
             )
             SwitchPreferenceWidget(
                 title = stringResource(R.string.reader_preferences_view_volume_scroll),
-                checked = volumeForScrollState,
+                checked = userPreferencesState.volumeForScroll,
                 onCheckedChanged = { webReaderViewModel.setVolumeRockerForScrollState(it) },
             )
             SwitchPreferenceWidget(
                 title = stringResource(R.string.reader_preferences_view_use_rtl),
-                checked = rtlTextState,
+                checked = userPreferencesState.rtlText,
                 onCheckedChanged = { webReaderViewModel.setRtlTextState(it) },
             )
         }

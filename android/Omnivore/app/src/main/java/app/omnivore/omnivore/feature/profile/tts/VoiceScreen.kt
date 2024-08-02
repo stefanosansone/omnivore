@@ -39,6 +39,7 @@ internal fun VoiceScreen(
     val voices = remember {
         Voices.Pairs
     }
+
     val uiState by viewModel.userPreferencesState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -62,15 +63,6 @@ internal fun VoiceScreen(
         LazyColumn(
             modifier = Modifier.padding(contentPadding),
         ) {
-            item {
-                val followingTabActive by viewModel.followingTabActiveState.collectAsStateWithLifecycle()
-
-                SwitchPreferenceWidget(
-                    title = stringResource(R.string.tts_use_ultra_realistic_voices),
-                    checked = !followingTabActive,
-                    onCheckedChanged = { viewModel.setFollowingTabActiveState(!it) },
-                )
-            }
             items(voices) {
                 ListItem(
                     modifier = Modifier.clickable {
