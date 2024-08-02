@@ -56,8 +56,6 @@ fun ReaderPreferencesSheet(
         }
     }
     val isFontListExpanded = remember { mutableStateOf(false) }
-    var highContrastTextSwitchState by
-        remember { mutableStateOf(currentWebPreferences.prefersHighContrastText) }
 
     var justifyTextSwitchState by
         remember { mutableStateOf(currentWebPreferences.prefersJustifyText) }

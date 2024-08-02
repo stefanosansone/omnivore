@@ -1,9 +1,9 @@
 package app.omnivore.omnivore.feature.profile.tts
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -26,19 +26,21 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import app.omnivore.omnivore.R
-import app.omnivore.omnivore.core.designsystem.component.SwitchPreferenceWidget
+import app.omnivore.omnivore.core.designsystem.component.PreferenceGroupHeader
+import app.omnivore.omnivore.core.network.model.speech.VoiceItem
 import app.omnivore.omnivore.core.network.model.speech.Voices
+import app.omnivore.omnivore.core.network.model.speech.Voices.Pairs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun VoiceScreen(
     navController: NavHostController,
+    languageKey: String?,
     viewModel: TextToSpeechViewModel = hiltViewModel()
 ) {
 
-    val voices = remember {
-        Voices.Pairs
-    }
+    val languages = remember { Voices.Languages }
+    val voices = remember { Voices.Pairs }
 
     val uiState by viewModel.userPreferencesState.collectAsStateWithLifecycle()
 
@@ -63,25 +65,41 @@ internal fun VoiceScreen(
         LazyColumn(
             modifier = Modifier.padding(contentPadding),
         ) {
-            items(voices) {
-                ListItem(
-                    modifier = Modifier.clickable {
-                        viewModel.setTtsVoice(it.firstName)
-                    },
-                    colors = ListItemDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    ),
-                    headlineContent = { Text(it.firstName) },
-                    trailingContent = {
-                        if (uiState.englishVoice == it.firstName) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    },
-                )
+            languages.find { it.key == languageKey }?.categories?.forEach { category ->
+                item {
+                    Column {
+                        PreferenceGroupHeader(title = category.displayName)
+                    }
+                }
+                val flatList = Pairs.flatMap {
+                    listOf(
+                        VoiceItem(name = it.firstName, category = it.category, key = it.firstKey, selected = false),
+                        VoiceItem(name = it.secondName, category = it.category, key = it.secondKey, selected = false)
+                    )
+                }
+
+                flatList.filter { it.category == category }.forEach {
+                    item {
+                        ListItem(
+                            modifier = Modifier.clickable {
+                                viewModel.setTtsVoice(it.name)
+                            },
+                            colors = ListItemDefaults.colors(
+                                containerColor = MaterialTheme.colorScheme.background
+                            ),
+                            headlineContent = { Text(it.name) },
+                            trailingContent = {
+                                if (uiState.englishVoice == it.name) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
             }
         }
     }

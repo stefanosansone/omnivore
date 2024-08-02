@@ -16,7 +16,9 @@ sealed class Routes(val route: String) {
     data object Filters : Routes("Filters")
     data object TextToSpeech : Routes("TextToSpeech")
     data object DefaultLanguage : Routes("DefaultLanguage")
-    data object Voices : Routes("Voices")
+    data object Voices : Routes("Voices/{languageKey}") {
+        fun createRoute(languageKey: String) = "Voices/$languageKey"
+    }
     data object Account : Routes("Account")
     data object Search : Routes("Search")
     data object Documentation : Routes("Documentation")

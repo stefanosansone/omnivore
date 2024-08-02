@@ -26,6 +26,7 @@ import androidx.compose.material.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -451,6 +452,15 @@ fun ReaderTopAppBar(
                         tint = themeTintColor
                     )
                 }
+            }
+            IconButton(onClick = {
+                webReaderViewModel.setBottomSheet(BottomSheetState.PREFERENCES)
+            }) {
+                Icon(
+                    imageVector = Icons.Rounded.PlayCircle,
+                    contentDescription = null,
+                    tint = themeTintColor
+                )
             }
             IconButton(onClick = {
                 webReaderViewModel.setBottomSheet(BottomSheetState.PREFERENCES)

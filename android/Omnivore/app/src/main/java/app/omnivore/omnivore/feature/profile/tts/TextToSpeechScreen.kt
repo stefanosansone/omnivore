@@ -30,7 +30,8 @@ internal fun TextToSpeechScreen(
     textToSpeechViewModel: TextToSpeechViewModel = hiltViewModel()
 ) {
 
-    val langs = remember { Voices.Languages }
+    val languages = remember { Voices.Languages }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -63,11 +64,13 @@ internal fun TextToSpeechScreen(
                     PreferenceGroupHeader(title = stringResource(R.string.tts_voices))
                 }
             }
-            item {
-                TextPreferenceWidget(
-                    title = stringResource(R.string.tts_voices),
-                    onPreferenceClick = { navController.navigate(Routes.Voices.route) },
-                )
+            languages.forEach { language ->
+                item {
+                    TextPreferenceWidget(
+                        title = language.name,
+                        onPreferenceClick = { navController.navigate(Routes.Voices.createRoute(language.key)) },
+                    )
+                }
             }
         }
     }

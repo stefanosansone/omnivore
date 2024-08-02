@@ -33,10 +33,12 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import app.omnivore.omnivore.core.designsystem.theme.OmnivoreBrand
 import app.omnivore.omnivore.feature.following.FollowingScreen
 import app.omnivore.omnivore.feature.library.LibraryView
@@ -169,8 +171,14 @@ fun PrimaryNavigator(
             LanguageScreen(navController = navController)
         }
 
-        composable(Routes.Voices.route) {
-            VoiceScreen(navController = navController)
+        composable(
+            route = Routes.Voices.route,
+            arguments = listOf(navArgument("languageKey") { type = NavType.StringType })
+        ) { backStackEntry ->
+            VoiceScreen(
+                navController = navController,
+                languageKey = backStackEntry.arguments?.getString("languageKey")
+            )
         }
 
         composable(Routes.Account.route) {
