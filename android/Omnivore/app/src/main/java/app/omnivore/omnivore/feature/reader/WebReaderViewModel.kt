@@ -134,11 +134,11 @@ class WebReaderViewModel @Inject constructor(
         }
     }
 
-    val rtlTextState: StateFlow<Boolean> = datastoreRepository.getBoolean(
-        rtlText
-    ).stateIn(
+    val rtlTextState: StateFlow<Boolean> = flow {
+        emit(datastoreRepository.getBoolean(rtlText))
+    }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        started = SharingStarted.Lazily,
         initialValue = false
     )
 
