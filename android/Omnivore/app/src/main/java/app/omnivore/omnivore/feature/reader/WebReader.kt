@@ -42,7 +42,7 @@ fun WebReader(
         )
     val isDarkMode = isSystemInDarkTheme()
 
-    val volumeForScrollState by webReaderViewModel.volumeRockerForScrollState.collectAsStateWithLifecycle()
+    val userPreferencesState by webReaderViewModel.userPreferencesState.collectAsStateWithLifecycle()
 
     Box(modifier) {
         AndroidView(factory = {
@@ -174,7 +174,7 @@ fun WebReader(
                     if (event.action == KeyEvent.ACTION_DOWN) {
                         when (keyCode) {
                             KeyEvent.KEYCODE_VOLUME_UP -> {
-                                if (!volumeForScrollState) {
+                                if (!userPreferencesState.volumeForScroll) {
                                     return@setOnKeyListener false
                                 }
                                 scrollVertically(OmnivoreWebView.Direction.UP)
@@ -182,7 +182,7 @@ fun WebReader(
                             }
 
                             KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                                if (!volumeForScrollState) {
+                                if (!userPreferencesState.volumeForScroll) {
                                     return@setOnKeyListener false
                                 }
                                 scrollVertically(OmnivoreWebView.Direction.DOWN)

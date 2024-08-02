@@ -20,11 +20,12 @@ const val lastUsedSavedItemFilter = "lastUsedSavedItemFilter"
 const val lastUsedSavedItemSortFilter = "lastUsedSavedItemSortFilter"
 const val preferredTheme = "preferredTheme"
 const val followingTabActive = "followingTabActive"
-const val volumeForScroll = "volumeForScroll"
-const val rtlText = "rtlText"
 
 object PreferencesKeys {
     val TTS_URV = booleanPreferencesKey("tts_urv")
     val TTS_ENGLISH_VOICE = stringPreferencesKey("tts_english_voice")
     val TTS_LANGUAGE = stringPreferencesKey("tts_language")
+    val RTL_TEXT = booleanPreferencesKey("rtl_text")
+    val VOLUME_ROCKER_FOR_SCROLL = booleanPreferencesKey("volume_rocker_for_scroll")
+    val HIGH_CONTRAST_TEXT = booleanPreferencesKey("high_contrast_text")
 }

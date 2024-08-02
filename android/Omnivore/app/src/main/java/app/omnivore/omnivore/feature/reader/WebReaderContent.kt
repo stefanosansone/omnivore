@@ -3,6 +3,7 @@ package app.omnivore.omnivore.feature.reader
 import android.util.Log
 import app.omnivore.omnivore.core.database.entities.Highlight
 import app.omnivore.omnivore.core.database.entities.SavedItem
+import app.omnivore.omnivore.core.datastore.UserPreferences
 import com.google.gson.Gson
 
 enum class WebFont(val displayText: String, val rawValue: String) {
@@ -48,7 +49,7 @@ data class ArticleContent(
 
 data class WebReaderContent(
     val preferences: WebPreferences,
-    val rtlText: Boolean,
+    val userPreferencesState: UserPreferences,
     val item: SavedItem,
     val articleContent: ArticleContent,
 ) {
@@ -62,7 +63,7 @@ data class WebReaderContent(
         val highlightCssFilePath =
             "highlight${if (preferences.themeKey == "Dark" || preferences.themeKey == "Black") "-dark" else ""}.css"
 
-        val rtlCss = if (rtlText) {
+        val rtlCss = if (userPreferencesState.rtlText) {
             """
             body, html, #_omnivore-htmlContent, p, a, div, span {
                 direction: rtl;
@@ -124,7 +125,7 @@ data class WebReaderContent(
                 window.fontFamily = "${preferences.fontFamily.rawValue}"
                 window.maxWidthPercentage = ${preferences.maxWidthPercentage}
                 window.lineHeight = ${preferences.lineHeight}
-                window.prefersHighContrastFont = ${preferences.prefersHighContrastText}
+                window.prefersHighContrastFont = ${userPreferencesState.highContrastText}
                 window.justifyText = ${preferences.prefersJustifyText}
                 window.enableHighlightBar = false
               </script>

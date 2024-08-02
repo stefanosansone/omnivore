@@ -25,6 +25,7 @@ import app.omnivore.omnivore.core.database.dao.SavedItemDao
 import app.omnivore.omnivore.core.database.entities.SavedItem
 import app.omnivore.omnivore.core.database.entities.SavedItemLabel
 import app.omnivore.omnivore.core.datastore.DatastoreRepository
+import app.omnivore.omnivore.core.datastore.UserPreferences
 import app.omnivore.omnivore.core.datastore.preferredTheme
 import app.omnivore.omnivore.core.datastore.preferredWebFontFamily
 import app.omnivore.omnivore.core.datastore.preferredWebFontSize
@@ -32,8 +33,6 @@ import app.omnivore.omnivore.core.datastore.preferredWebLineHeight
 import app.omnivore.omnivore.core.datastore.preferredWebMaxWidthPercentage
 import app.omnivore.omnivore.core.datastore.prefersJustifyText
 import app.omnivore.omnivore.core.datastore.prefersWebHighContrastText
-import app.omnivore.omnivore.core.datastore.rtlText
-import app.omnivore.omnivore.core.datastore.volumeForScroll
 import app.omnivore.omnivore.core.network.Networker
 import app.omnivore.omnivore.core.network.createNewLabel
 import app.omnivore.omnivore.core.network.loadLibraryItemContent
@@ -54,7 +53,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -134,12 +132,10 @@ class WebReaderViewModel @Inject constructor(
         }
     }
 
-    val rtlTextState: StateFlow<Boolean> = flow {
-        emit(datastoreRepository.getBoolean(rtlText))
-    }.stateIn(
+    val userPreferencesState: StateFlow<UserPreferences> = datastoreRepository.userPreferencesFlow.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Lazily,
-        initialValue = false
+        started = SharingStarted.Eagerly,
+        initialValue = UserPreferences()
     )
 
     fun showNavBar() {
@@ -555,14 +551,11 @@ class WebReaderViewModel @Inject constructor(
         enqueueScript(script)
     }
 
-    fun updateHighContrastTextPreference(prefersHighContrastText: Boolean) {
-        runBlocking {
-            datastoreRepository.putString(
-                prefersWebHighContrastText,
-                prefersHighContrastText.toString()
-            )
+    fun setHighContrastTextState(isHighContrastTextActive: Boolean) {
+        viewModelScope.launch {
+            datastoreRepository.setHighContrastText(isHighContrastTextActive)
         }
-        val fontContrastValue = if (prefersHighContrastText) "high" else "normal"
+        val fontContrastValue = if (isHighContrastTextActive) "high" else "normal"
         val script =
             "var event = new Event('handleFontContrastChange');event.fontContrast = '$fontContrastValue';document.dispatchEvent(event);"
         enqueueScript(script)
@@ -577,23 +570,15 @@ class WebReaderViewModel @Inject constructor(
         enqueueScript(script)
     }
 
-    val volumeRockerForScrollState: StateFlow<Boolean> = flow {
-        emit(datastoreRepository.getBoolean(volumeForScroll))
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Lazily,
-        initialValue = false
-    )
-
-    fun setVolumeRockerForScrollState(value: Boolean) {
+    fun setVolumeRockerForScrollState(isVolumeRockerForScrollActive: Boolean) {
         viewModelScope.launch {
-            datastoreRepository.putBoolean(volumeForScroll, value)
+            datastoreRepository.setVolumeRockerForScroll(isVolumeRockerForScrollActive)
         }
     }
 
-    fun setRtlTextState(value: Boolean) {
+    fun setRtlTextState(isRtlTextActive: Boolean) {
         viewModelScope.launch {
-            datastoreRepository.putBoolean(rtlText, value)
+            datastoreRepository.setRtlText(isRtlTextActive)
         }
     }
 

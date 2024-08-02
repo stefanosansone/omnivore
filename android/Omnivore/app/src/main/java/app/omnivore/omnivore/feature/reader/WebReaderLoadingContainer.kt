@@ -161,14 +161,14 @@ fun WebReaderLoadingContainer(
 
     val darkTheme = isSystemInDarkTheme()
 
-    val rtlTextState by webReaderViewModel.rtlTextState.collectAsStateWithLifecycle()
+    val userPreferencesState by webReaderViewModel.userPreferencesState.collectAsStateWithLifecycle()
 
     val styledContent by remember {
         derivedStateOf {
             webReaderParams?.let {
                 val webReaderContent = WebReaderContent(
                     preferences = webReaderViewModel.storedWebPreferences(darkTheme),
-                    rtlText = rtlTextState,
+                    userPreferencesState = userPreferencesState,
                     item = it.item,
                     articleContent = it.articleContent
                 )

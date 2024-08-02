@@ -1,7 +1,10 @@
 package app.omnivore.omnivore.core.datastore
 
 data class UserPreferences(
-    val ttsUrv: Boolean,
-    val englishVoice: String,
-    val ttsLanguage: String
+    val ttsUrv: Boolean = false,
+    val englishVoice: String = "",
+    val ttsLanguage: String = "",
+    val rtlText: Boolean = false,
+    val volumeForScroll: Boolean = false,
+    val highContrastText: Boolean = false
 )
