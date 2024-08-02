@@ -1,5 +1,6 @@
 package app.omnivore.omnivore.core.database.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
@@ -27,5 +28,6 @@ data class SavedItemLabel(
     )]
 )
 data class SavedItemAndSavedItemLabelCrossRef(
-    val savedItemLabelId: String, val savedItemId: String
+    val savedItemLabelId: String,
+    @ColumnInfo(index = true) val savedItemId: String
 )

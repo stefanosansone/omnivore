@@ -1,5 +1,6 @@
 package app.omnivore.omnivore.core.database.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Embedded
 import androidx.room.Entity
@@ -54,7 +55,7 @@ data class Highlight(
 )
 data class SavedItemAndHighlightCrossRef(
   val highlightId: String,
-  val savedItemId: String
+  @ColumnInfo(index = true) val savedItemId: String
 )
 
 @Dao
