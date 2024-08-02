@@ -18,6 +18,7 @@ plugins {
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.org.jetbrains.kotlin.android) apply false
     alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.room) apply false
 }
 
 task<Delete>("clean") {

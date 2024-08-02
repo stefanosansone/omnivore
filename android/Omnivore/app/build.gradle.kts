@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.apollo)
     id("kotlinx-serialization")
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.room)
 }
 
 val keystorePropertiesFile = rootProject.file("app/external/keystore.properties")
@@ -97,6 +98,9 @@ android {
         resources {
             excludes += listOf("/META-INF/{AL2.0,LGPL2.1}")
         }
+    }
+    room {
+        schemaDirectory("$projectDir/schemas")
     }
 }
 
